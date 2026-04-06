@@ -1,0 +1,101 @@
+---
+import { getCollection } from 'astro:content';
+
+interface Props {
+  currentCategory: string;
+  currentDocId: string;
+}
+
+const { currentCategory, currentDocId } = Astro.props;
+
+const allDocs = await getCollection('docs');
+
+// Get docs from current category only
+const categoryDocs = allDocs.filter(doc => doc.data.category === currentCategory);
+---
+
+<aside class="docs-sidebar">
+  <div class="sidebar-content">
+    <h2 class="sidebar-title">{currentCategory}</h2>
+    
+    <nav class="sidebar-nav">
+      <ul class="doc-list">
+        {categoryDocs.map(doc => {
+          const isActive = doc.id === currentDocId;
+          return (
+            <li>
+              <a 
+                href={`/docs/${doc.id}`}
+                class={isActive ? 'active' : ''}
+              >
+                {doc.data.title}
+              </a>
+            </li>
+          );
+        })}
+      </ul>
+    </nav>
+  </div>
+</aside>
+
+<style>
+  .docs-sidebar {
+    width: 260px;
+    background: var(--bg-primary);
+    border-right: 1px solid var(--border);
+    height: calc(100vh - 64px);
+    position: sticky;
+    top: 64px;
+    overflow-y: auto;
+  }
+
+  .sidebar-content {
+    padding: 1.5rem;
+  }
+
+  .sidebar-title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    margin-bottom: 1.5rem;
+    text-transform: capitalize;
+    color: var(--text-primary);
+  }
+
+  .doc-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .doc-list li {
+    margin-bottom: 0.25rem;
+  }
+
+  .doc-list a {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    display: block;
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--radius-sm);
+    transition: all 0.2s ease;
+  }
+
+  .doc-list a:hover {
+    background: var(--primary-light);
+    color: var(--primary);
+    transform: translateX(4px);
+  }
+
+  .doc-list a.active {
+    background: var(--primary-light);
+    color: var(--primary);
+    font-weight: 600;
+    border-left: 3px solid var(--primary);
+  }
+
+  @media (max-width: 1024px) {
+    .docs-sidebar {
+      display: none;
+    }
+  }
+</style>

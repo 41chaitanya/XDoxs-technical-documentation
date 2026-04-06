@@ -1,0 +1,276 @@
+---
+import { getCollection } from 'astro:content';
+
+const allDocs = await getCollection('docs');
+
+// Group docs by category
+const docsByCategory = allDocs.reduce((acc, doc) => {
+  const category = doc.data.category;
+  if (!acc[category]) {
+    acc[category] = [];
+  }
+  acc[category].push(doc);
+  return acc;
+}, {} as Record<string, typeof allDocs>);
+
+const categories = Object.keys(docsByCategory).sort();
+---
+
+<header class="header">
+  <div class="container">
+    <nav class="nav">
+      <a href="/" class="logo">XDoxs</a>
+      
+      <div class="nav-links">
+        <!-- Docs Dropdown -->
+        <div class="dropdown">
+          <a href="#" class="dropdown-trigger">
+            Docs
+            <svg class="dropdown-arrow" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+          </a>
+          
+          <div class="dropdown-menu">
+            <div class="dropdown-content">
+              {categories.map(category => (
+                <div class="dropdown-section">
+                  <div class="dropdown-category">{category}</div>
+                  <div class="dropdown-items">
+                    {docsByCategory[category].map(doc => (
+                      <a href={`/docs/${doc.id}`} class="dropdown-item">
+                        {doc.data.title}
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+        
+        <a href="https://github.com/yourusername/xdoxs" target="_blank">GitHub</a>
+        
+        <a href="/login" class="login-btn">Login</a>
+      </div>
+    </nav>
+  </div>
+</header>
+
+<style>
+  .header {
+    background: oklch(1 0 0 / 0.8);
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .header {
+      background: oklch(0.15 0 0 / 0.8);
+    }
+  }
+
+  .nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    height: 64px;
+  }
+
+  .logo {
+    font-size: 1.5rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .nav-links {
+    display: flex;
+    gap: 2rem;
+    align-items: center;
+  }
+
+  .nav-links > a {
+    color: var(--text-primary);
+    font-weight: 500;
+    transition: all 0.2s ease;
+    position: relative;
+  }
+
+  .nav-links > a::after {
+    content: '';
+    position: absolute;
+    bottom: -4px;
+    left: 0;
+    width: 0;
+    height: 2px;
+    background: var(--primary);
+    transition: width 0.2s ease;
+  }
+
+  .nav-links > a:hover {
+    color: var(--primary);
+  }
+
+  .nav-links > a:hover::after {
+    width: 100%;
+  }
+
+  /* Login Button */
+  .login-btn {
+    background: var(--primary);
+    color: white !important;
+    padding: 0.5rem 1.25rem;
+    border-radius: var(--radius-sm);
+    font-weight: 600;
+    transition: all 0.2s ease;
+  }
+
+  .login-btn::after {
+    display: none;
+  }
+
+  .login-btn:hover {
+    background: var(--primary-hover);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px oklch(0 0 0 / 0.15);
+  }
+
+  /* Dropdown */
+  .dropdown {
+    position: relative;
+  }
+
+  .dropdown-trigger {
+    color: var(--text-primary);
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    transition: all 0.2s ease;
+    position: relative;
+  }
+
+  .dropdown-trigger::after {
+    content: '';
+    position: absolute;
+    bottom: -4px;
+    left: 0;
+    width: 0;
+    height: 2px;
+    background: var(--primary);
+    transition: width 0.2s ease;
+  }
+
+  .dropdown-trigger:hover {
+    color: var(--primary);
+  }
+
+  .dropdown:hover .dropdown-trigger::after {
+    width: 100%;
+  }
+
+  .dropdown-arrow {
+    transition: transform 0.2s ease;
+  }
+
+  .dropdown:hover .dropdown-arrow {
+    transform: rotate(180deg);
+  }
+
+  .dropdown-menu {
+    position: absolute;
+    top: calc(100% + 0.5rem);
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-lg);
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.2s ease;
+    min-width: 500px;
+    max-height: 70vh;
+    overflow-y: auto;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .dropdown-menu {
+      background: var(--bg-secondary);
+    }
+  }
+
+  .dropdown:hover .dropdown-menu {
+    opacity: 1;
+    visibility: visible;
+  }
+
+  .dropdown-content {
+    padding: 1rem;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1.5rem;
+  }
+
+  .dropdown-section {
+    min-width: 0;
+  }
+
+  .dropdown-category {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-secondary);
+    margin-bottom: 0.75rem;
+    padding: 0 0.5rem;
+  }
+
+  .dropdown-items {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .dropdown-item {
+    padding: 0.5rem 0.75rem;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    border-radius: var(--radius-sm);
+    transition: all 0.2s ease;
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .dropdown-item:hover {
+    background: var(--primary-light);
+    color: var(--primary);
+    transform: translateX(4px);
+  }
+
+  @media (max-width: 768px) {
+    .nav-links {
+      gap: 1rem;
+    }
+
+    .dropdown-menu {
+      min-width: 90vw;
+      left: auto;
+      right: 0;
+      transform: none;
+    }
+
+    .dropdown-content {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

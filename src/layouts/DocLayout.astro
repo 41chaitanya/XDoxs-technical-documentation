@@ -1,0 +1,197 @@
+---
+import BaseLayout from './BaseLayout.astro';
+import Header from '../components/Header.astro';
+import DocsSidebar from '../components/DocsSidebar.astro';
+import TableOfContents from '../components/TableOfContents.astro';
+
+interface Props {
+  title: string;
+  description: string;
+  date: Date;
+  author: string;
+  category: string;
+  tags: string[];
+  headings: Array<{
+    depth: number;
+    slug: string;
+    text: string;
+  }>;
+  docId: string;
+}
+
+const { title, description, date, author, category, tags, headings, docId } = Astro.props;
+
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'TechArticle',
+  headline: title,
+  description: description,
+  author: {
+    '@type': 'Person',
+    name: author,
+  },
+  datePublished: date.toISOString(),
+  keywords: tags.join(', '),
+};
+---
+
+<BaseLayout title={title} description={description}>
+  <Header />
+  
+  <div class="doc-container">
+    <DocsSidebar currentCategory={category} currentDocId={docId} />
+    
+    <main class="doc-main">
+      <nav class="breadcrumb">
+        <a href="/">Home</a>
+        <span>/</span>
+        <a href="#" onclick="history.back(); return false;">Docs</a>
+        <span>/</span>
+        <span class="current">{category}</span>
+      </nav>
+      
+      <article class="doc-article">
+        <header class="doc-header">
+          <h1>{title}</h1>
+          <p class="doc-description">{description}</p>
+          
+          <div class="doc-meta">
+            <span>By {author}</span>
+            <span>•</span>
+            <time datetime={date.toISOString()}>
+              {date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+            </time>
+            <span>•</span>
+            <span class="category-badge">{category}</span>
+          </div>
+          
+          <div class="tags">
+            {tags.map(tag => (
+              <span class="tag">{tag}</span>
+            ))}
+          </div>
+        </header>
+        
+        <div class="doc-content">
+          <slot />
+        </div>
+      </article>
+    </main>
+    
+    <TableOfContents headings={headings} />
+  </div>
+  
+  <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+</BaseLayout>
+
+<style>
+  .doc-container {
+    display: flex;
+  }
+
+  .doc-main {
+    flex: 1;
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem;
+  }
+
+  .breadcrumb {
+    font-size: 0.875rem;
+    margin-bottom: 1.5rem;
+    color: var(--text-secondary);
+  }
+
+  .breadcrumb a {
+    color: var(--text-secondary);
+  }
+
+  .breadcrumb a:hover {
+    color: var(--primary);
+  }
+
+  .breadcrumb span {
+    margin: 0 0.5rem;
+  }
+
+  .breadcrumb .current {
+    color: var(--text-primary);
+    text-transform: capitalize;
+  }
+
+  .doc-article {
+    background: var(--bg-primary);
+    padding: 2.5rem;
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+  }
+
+  .doc-header {
+    margin-bottom: 2rem;
+    padding-bottom: 2rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .doc-header h1 {
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+  }
+
+  .doc-description {
+    font-size: 1.25rem;
+    color: var(--text-secondary);
+    margin-bottom: 1rem;
+  }
+
+  .doc-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    margin-bottom: 1rem;
+  }
+
+  .category-badge {
+    text-transform: capitalize;
+  }
+
+  .tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .tag {
+    padding: 0.25rem 0.75rem;
+    background: var(--primary-light);
+    color: var(--primary);
+    border-radius: 999px;
+    font-size: 0.875rem;
+    font-weight: 500;
+  }
+
+  .doc-content {
+    line-height: 1.8;
+  }
+
+  .doc-content :global(h2) {
+    margin-top: 2rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .doc-content :global(h3) {
+    margin-top: 1.5rem;
+  }
+
+  @media (max-width: 768px) {
+    .doc-article {
+      padding: 1.5rem;
+    }
+
+    .doc-header h1 {
+      font-size: 2rem;
+    }
+  }
+</style>

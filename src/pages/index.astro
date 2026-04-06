@@ -1,17 +1,327 @@
 ---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Header from '../components/Header.astro';
+import { getCollection } from 'astro:content';
 
+const allDocs = await getCollection('docs');
+const featuredDocs = allDocs.filter(doc => doc.data.featured);
+const categories = [...new Set(allDocs.map(doc => doc.data.category))];
 ---
 
-<html lang="en">
-	<head>
-		<meta charset="utf-8" />
-		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-		<link rel="icon" href="/favicon.ico" />
-		<meta name="viewport" content="width=device-width" />
-		<meta name="generator" content={Astro.generator} />
-		<title>Astro</title>
-	</head>
-	<body>
-		<h1>Astro</h1>
-	</body>
-</html>
+<BaseLayout title="Home" description="XDoxs - Learn technology in depth with comprehensive documentation by Sheryians Coding School">
+  <Header />
+  
+  <main>
+    <!-- Hero -->
+    <section class="hero">
+      <div class="container">
+        <div class="hero-content">
+          <div class="badge">By Sheryians Coding School</div>
+          <h1>Learn Technology <span class="gradient">In Depth</span></h1>
+          <p class="hero-text">
+            XDoxs is a comprehensive documentation platform by <a href="https://sheryians.com/" target="_blank" class="sheryians-link">Sheryians Coding School</a>, 
+            where you can explore in-depth technical documentation and master programming concepts deeply.
+          </p>
+          <div class="hero-buttons">
+            <a href="/docs/javascript/arrays" class="btn btn-primary">
+              Explore Documentation
+            </a>
+            <a href="https://sheryians.com/" target="_blank" class="btn btn-secondary">
+              Visit Sheryians
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+    
+    <!-- Documentation Categories -->
+    <section class="section">
+      <div class="container">
+        <div class="section-header">
+          <h2>Documentation</h2>
+          <p>Explore in-depth guides and tutorials organized by technology</p>
+        </div>
+        
+        <div class="grid">
+          {categories.map(category => {
+            const categoryDocs = allDocs.filter(doc => doc.data.category === category);
+            return (
+              <a href={`/docs/${categoryDocs[0].id}`} class="card">
+                <h3>{category}</h3>
+                <p>{categoryDocs.length} {categoryDocs.length === 1 ? 'article' : 'articles'}</p>
+                <span class="card-link">Explore →</span>
+              </a>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+    
+    <!-- Create Your Own Docs -->
+    <section class="section section-alt">
+      <div class="container">
+        <div class="create-docs-section">
+          <div class="create-docs-content">
+            <h2>Create Your Own Documentation</h2>
+            <p>
+              Students can create and share their own project documentation using XDoxs. 
+              Document your projects, share knowledge with the community, and build your portfolio.
+            </p>
+            <a href="#" class="btn btn-create">
+              Get Started
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+  
+  <footer class="footer">
+    <div class="container">
+      <p>&copy; 2026 XDoxs by <a href="https://sheryians.com/" target="_blank">Sheryians Coding School</a></p>
+    </div>
+  </footer>
+</BaseLayout>
+
+<style>
+  /* Hero */
+  .hero {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    padding: 6rem 0;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .hero::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: 
+      radial-gradient(circle at 20% 50%, var(--primary-light) 0%, transparent 50%),
+      radial-gradient(circle at 80% 80%, var(--primary-light) 0%, transparent 50%);
+    opacity: 0.3;
+    pointer-events: none;
+  }
+
+  .hero-content {
+    max-width: 800px;
+    margin: 0 auto;
+    position: relative;
+    z-index: 1;
+  }
+
+  .badge {
+    display: inline-block;
+    padding: 0.5rem 1.25rem;
+    background: var(--primary-light);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-size: 0.875rem;
+    margin-bottom: 2rem;
+    color: var(--primary);
+    font-weight: 500;
+  }
+
+  .hero h1 {
+    font-size: 3.5rem;
+    margin-bottom: 1.5rem;
+    color: var(--text-primary);
+  }
+
+  .gradient {
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .hero-text {
+    font-size: 1.25rem;
+    margin-bottom: 2rem;
+    color: var(--text-secondary);
+    line-height: 1.7;
+  }
+
+  .sheryians-link {
+    color: var(--primary);
+    font-weight: 700;
+    transition: all 0.2s;
+  }
+
+  .sheryians-link:hover {
+    color: var(--primary-hover);
+  }
+
+  .hero-buttons {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .btn {
+    padding: 0.75rem 2rem;
+    border-radius: var(--radius);
+    font-weight: 600;
+    transition: all 0.2s;
+    display: inline-block;
+  }
+
+  .btn-primary {
+    background: var(--primary);
+    color: white;
+    box-shadow: 0 4px 14px oklch(0 0 0 / 0.15);
+  }
+
+  .btn-primary:hover {
+    background: var(--primary-hover);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px oklch(0 0 0 / 0.2);
+  }
+
+  .btn-secondary {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+  }
+
+  .btn-secondary:hover {
+    background: var(--bg-tertiary);
+    border-color: var(--primary);
+  }
+
+  /* Sections */
+  .section {
+    padding: 4rem 0;
+    background: var(--bg-primary);
+  }
+
+  .section-alt {
+    background: var(--bg-secondary);
+  }
+
+  .section-header {
+    text-align: center;
+    margin-bottom: 3rem;
+  }
+
+  .section-header h2 {
+    font-size: 2.5rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .section-header p {
+    font-size: 1.125rem;
+  }
+
+  /* Create Docs Section */
+  .create-docs-section {
+    max-width: 700px;
+    margin: 0 auto;
+    text-align: center;
+  }
+
+  .create-docs-content h2 {
+    font-size: 2.25rem;
+    margin-bottom: 1rem;
+    color: var(--text-primary);
+  }
+
+  .create-docs-content p {
+    font-size: 1.125rem;
+    color: var(--text-secondary);
+    margin-bottom: 2rem;
+    line-height: 1.7;
+  }
+
+  .btn-create {
+    background: var(--primary);
+    color: white;
+    padding: 0.875rem 2.5rem;
+    font-size: 1.05rem;
+  }
+
+  .btn-create:hover {
+    background: var(--primary-hover);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px oklch(0 0 0 / 0.15);
+  }
+
+  /* Grid */
+  .grid {
+    display: grid;
+    gap: 1.5rem;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  }
+
+  /* Cards */
+  .card {
+    background: var(--bg-primary);
+    padding: 2rem;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    transition: all 0.3s;
+    display: block;
+    color: inherit;
+  }
+
+  .card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-lg);
+    border-color: var(--primary);
+  }
+
+  .card h3 {
+    font-size: 1.25rem;
+    margin-bottom: 0.5rem;
+    text-transform: capitalize;
+    color: var(--text-primary);
+  }
+
+  .card p {
+    margin-bottom: 1rem;
+    color: var(--text-secondary);
+  }
+
+  .card-link {
+    color: var(--primary);
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+  }
+
+  /* Footer */
+  .footer {
+    background: #1a1a1a;
+    color: white;
+    padding: 2rem 0;
+    text-align: center;
+  }
+
+  .footer p {
+    color: rgba(255, 255, 255, 0.8);
+  }
+
+  .footer a {
+    color: var(--primary);
+    font-weight: 600;
+  }
+
+  .footer a:hover {
+    text-decoration: underline;
+  }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .hero h1 {
+      font-size: 2rem;
+    }
+  }
+</style>
