@@ -1,0 +1,746 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import Header from '../../../components/Header.astro';
+import { verifyToken } from '../../../lib/auth/jwt';
+import { getInstructorDrafts } from '../../../lib/db/docs';
+
+export const prerender = false;
+
+const token = Astro.cookies.get('auth_token')?.value;
+if (!token) return Astro.redirect('/login');
+
+const payload = verifyToken(token);
+if (!payload || (payload.role !== 'instructor' && payload.role !== 'super_admin')) {
+  return Astro.redirect('/login');
+}
+
+// Fetch existing drafts for the "append to existing" dropdown
+const existingDrafts = await getInstructorDrafts(payload.userId);
+const draftOptions = existingDrafts.filter(d => d.status === 'draft' || d.status === 'rejected');
+---
+
+<BaseLayout title="Upload Documentation - XDoxs">
+  <Header />
+  <div class="upload-container">
+    <div class="upload-card">
+      <h1>Upload Documentation</h1>
+
+      <!-- Mode tabs -->
+      <div class="mode-tabs">
+        <button class="mode-tab active" id="tab-file" onclick="switchMode('file')">Upload .md File</button>
+        <button class="mode-tab" id="tab-topic" onclick="switchMode('topic')">Add Single Topic</button>
+      </div>
+
+      <!-- MODE 1: Upload full MD file -->
+      <div id="mode-file">
+        <p class="mode-desc">Upload a complete markdown file — it will be split into topics by <code>##</code> headings automatically.</p>
+
+        <div class="upload-area" id="upload-area">
+          <svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+          </svg>
+          <h3>Drop your .md file here</h3>
+          <p>or click to browse</p>
+          <input type="file" id="file-input" accept=".md,.markdown" hidden>
+          <button class="browse-btn" onclick="document.getElementById('file-input').click()">Browse Files</button>
+        </div>
+
+        <div class="form-section" id="form-section" style="display:none">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Category *</label>
+              <select id="category">
+                <option value="">Select category</option>
+                <option value="javascript">JavaScript</option>
+                <option value="python">Python</option>
+                <option value="html">HTML / CSS</option>
+                <option value="devops">DevOps</option>
+                <option value="react">React</option>
+                <option value="nodejs">Node.js</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Title *</label>
+              <input type="text" id="title" placeholder="e.g., JavaScript Complete Guide" />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Description</label>
+              <input type="text" id="description" placeholder="Brief description" />
+            </div>
+            <div class="form-group">
+              <label>Tags (comma separated)</label>
+              <input type="text" id="tags" placeholder="beginner, tutorial" />
+            </div>
+          </div>
+
+          <div class="preview-box">
+            <div class="preview-header">
+              <span>File Preview</span>
+              <span id="topic-count" class="topic-badge"></span>
+            </div>
+            <div class="markdown-preview" id="markdown-preview"></div>
+          </div>
+
+          <div class="actions">
+            <button class="btn-primary" id="submit-btn">Open in Editor</button>
+            <button class="btn-secondary" onclick="location.reload()">Cancel</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- MODE 2: Add single topic -->
+      <div id="mode-topic" style="display:none">
+        <p class="mode-desc">Add one topic at a time. Upload a .md file or write content. Choose an existing doc to append to, or create a new one.</p>
+
+        <div class="form-section">
+          <div class="form-group">
+            <label>Add to *</label>
+            <select id="target-doc">
+              <option value="new">+ New Documentation</option>
+              {draftOptions.map(d => (
+                <option value={d._id}>{d.title} ({d.category})</option>
+              ))}
+            </select>
+          </div>
+
+          <!-- New doc fields — shown only when "new" selected -->
+          <div id="new-doc-fields">
+            <div class="form-row">
+              <div class="form-group">
+                <label>Category *</label>
+                <select id="new-category">
+                  <option value="">Select category</option>
+                  <option value="javascript">JavaScript</option>
+                  <option value="python">Python</option>
+                  <option value="html">HTML / CSS</option>
+                  <option value="devops">DevOps</option>
+                  <option value="react">React</option>
+                  <option value="nodejs">Node.js</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Doc Title *</label>
+                <input type="text" id="new-doc-title" placeholder="e.g., JavaScript Complete Guide" />
+              </div>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Topic Title *</label>
+            <input type="text" id="topic-title" placeholder="e.g., Variables and Data Types" />
+          </div>
+
+          <div class="form-group">
+            <label>Topic Content</label>
+            <div class="content-options">
+              <button type="button" class="content-option active" id="btn-write">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+                  <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                </svg>
+                Write Content
+              </button>
+              <button type="button" class="content-option" id="btn-upload-topic">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+                </svg>
+                Upload .md File
+              </button>
+            </div>
+          </div>
+
+          <!-- Write mode -->
+          <div id="write-mode">
+            <div class="form-group">
+              <textarea id="topic-content" rows="12" placeholder="## Variables and Data Types&#10;&#10;Start writing your topic content here..."></textarea>
+            </div>
+          </div>
+
+          <!-- Upload mode -->
+          <div id="upload-mode" style="display:none">
+            <div class="topic-upload-area" id="topic-upload-area">
+              <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+              </svg>
+              <p>Drop .md file or click to browse</p>
+              <input type="file" id="topic-file-input" accept=".md,.markdown" hidden>
+              <button type="button" class="browse-btn-small" id="browse-topic-file">Browse</button>
+            </div>
+            <div id="topic-file-preview" style="display:none">
+              <div class="file-info">
+                <span id="topic-file-name"></span>
+                <button type="button" class="btn-remove" id="clear-topic-file">✕</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="actions">
+            <button class="btn-primary" id="add-topic-btn">Add Topic & Open Editor</button>
+            <button class="btn-secondary" onclick="location.reload()">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    .upload-container {
+      min-height: calc(100vh - 64px);
+      padding: 2rem;
+    }
+
+    .upload-card {
+      max-width: 860px;
+      margin: 0 auto;
+    }
+
+    .upload-card h1 {
+      font-size: 1.75rem;
+      margin-bottom: 1.5rem;
+      color: var(--text-primary);
+    }
+
+    .mode-tabs {
+      display: flex;
+      gap: 0;
+      margin-bottom: 2rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      width: fit-content;
+    }
+
+    .mode-tab {
+      padding: 0.6rem 1.25rem;
+      background: var(--bg-secondary);
+      color: var(--text-secondary);
+      border: none;
+      cursor: pointer;
+      font-size: 0.9rem;
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+
+    .mode-tab.active {
+      background: var(--primary);
+      color: white;
+    }
+
+    .mode-desc {
+      color: var(--text-secondary);
+      margin-bottom: 1.5rem;
+      font-size: 0.9rem;
+    }
+
+    .mode-desc code {
+      background: var(--bg-secondary);
+      padding: 0.1rem 0.4rem;
+      border-radius: 4px;
+      font-size: 0.85em;
+    }
+
+    .upload-area {
+      border: 2px dashed var(--border);
+      border-radius: 12px;
+      padding: 3rem;
+      text-align: center;
+      background: var(--bg-secondary);
+      transition: all 0.3s;
+      cursor: pointer;
+      margin-bottom: 1.5rem;
+    }
+
+    .upload-area:hover, .upload-area.dragover {
+      border-color: var(--primary);
+      background: var(--primary-light);
+    }
+
+    .upload-area svg { color: var(--primary); margin-bottom: 1rem; }
+    .upload-area h3 { color: var(--text-primary); margin-bottom: 0.5rem; }
+    .upload-area p { color: var(--text-secondary); margin-bottom: 1rem; }
+
+    .browse-btn {
+      padding: 0.6rem 1.25rem;
+      background: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+
+    .form-section {
+      background: var(--bg-secondary);
+      padding: 1.5rem;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      margin-bottom: 1.5rem;
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    .form-group { margin-bottom: 1rem; }
+    .form-group:last-child { margin-bottom: 0; }
+
+    .form-group label {
+      display: block;
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: var(--text-primary);
+      margin-bottom: 0.4rem;
+    }
+
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+      width: 100%;
+      padding: 0.65rem 0.75rem;
+      background: var(--bg-primary);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text-primary);
+      font-size: 0.95rem;
+      font-family: inherit;
+      transition: border-color 0.2s;
+      box-sizing: border-box;
+    }
+
+    .form-group textarea {
+      resize: vertical;
+      font-family: 'Courier New', monospace;
+      font-size: 0.875rem;
+      line-height: 1.6;
+    }
+
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+
+    .preview-box {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      margin-bottom: 1.5rem;
+    }
+
+    .preview-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.6rem 1rem;
+      background: var(--bg-primary);
+      border-bottom: 1px solid var(--border);
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: var(--text-secondary);
+    }
+
+    .topic-badge {
+      background: var(--primary-light);
+      color: var(--primary);
+      padding: 0.2rem 0.6rem;
+      border-radius: 999px;
+      font-size: 0.75rem;
+    }
+
+    .markdown-preview {
+      padding: 1.5rem;
+      max-height: 300px;
+      overflow-y: auto;
+      color: var(--text-primary);
+      line-height: 1.7;
+      font-size: 0.9rem;
+    }
+
+    .markdown-preview h1 { font-size: 1.5rem; margin: 1rem 0 0.5rem; }
+    .markdown-preview h2 { font-size: 1.25rem; margin: 1rem 0 0.5rem; color: var(--primary); }
+    .markdown-preview h3 { font-size: 1.1rem; margin: 0.75rem 0 0.4rem; }
+    .markdown-preview p { margin-bottom: 0.75rem; }
+    .markdown-preview code {
+      background: oklch(0.2 0 0);
+      color: oklch(0.9 0 0);
+      padding: 0.15rem 0.35rem;
+      border-radius: 3px;
+      font-size: 0.85em;
+    }
+    .markdown-preview pre {
+      background: oklch(0.15 0 0);
+      color: oklch(0.9 0 0);
+      padding: 1rem;
+      border-radius: 6px;
+      overflow-x: auto;
+      margin-bottom: 0.75rem;
+    }
+    .markdown-preview pre code { background: none; padding: 0; }
+
+    .actions {
+      display: flex;
+      gap: 0.75rem;
+    }
+
+    .btn-primary, .btn-secondary {
+      padding: 0.7rem 1.5rem;
+      border-radius: 8px;
+      font-weight: 500;
+      border: none;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-size: 0.95rem;
+    }
+
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-primary:hover { background: var(--primary-hover); }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-secondary { background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--border); }
+    .btn-secondary:hover { border-color: var(--primary); }
+
+    .content-options {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .content-option {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      padding: 0.65rem 1rem;
+      background: var(--bg-primary);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text-secondary);
+      font-size: 0.875rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .content-option:hover {
+      border-color: var(--primary);
+      color: var(--text-primary);
+    }
+
+    .content-option.active {
+      background: var(--primary);
+      color: white;
+      border-color: var(--primary);
+    }
+
+    .content-option svg {
+      flex-shrink: 0;
+    }
+
+    .topic-upload-area {
+      border: 2px dashed var(--border);
+      border-radius: 8px;
+      padding: 2rem;
+      text-align: center;
+      background: var(--bg-primary);
+      transition: all 0.2s;
+      cursor: pointer;
+    }
+
+    .topic-upload-area:hover {
+      border-color: var(--primary);
+      background: var(--primary-light);
+    }
+
+    .topic-upload-area svg {
+      color: var(--primary);
+      margin-bottom: 0.75rem;
+    }
+
+    .topic-upload-area p {
+      color: var(--text-secondary);
+      margin-bottom: 0.75rem;
+      font-size: 0.9rem;
+    }
+
+    .browse-btn-small {
+      padding: 0.5rem 1rem;
+      background: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.875rem;
+      font-weight: 500;
+      cursor: pointer;
+    }
+
+    .file-info {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.75rem 1rem;
+      background: var(--bg-primary);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin-bottom: 1rem;
+    }
+
+    .file-info span {
+      color: var(--text-primary);
+      font-size: 0.9rem;
+    }
+
+    .btn-remove {
+      padding: 0.25rem 0.5rem;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      font-size: 0.875rem;
+      transition: all 0.2s;
+    }
+
+    .btn-remove:hover {
+      background: oklch(0.577 0.245 27.325);
+      color: white;
+      border-color: oklch(0.577 0.245 27.325);
+    }
+
+    @media (max-width: 600px) {
+      .form-row { grid-template-columns: 1fr; }
+      .content-options { flex-direction: column; }
+    }
+  </style>
+
+  <script define:vars={{ draftOptions: draftOptions.map(d => ({ _id: String(d._id), title: d.title })) }}>
+    let markdownContent = '';
+
+    // --- Mode switching ---
+    window.switchMode = function(mode) {
+      document.getElementById('mode-file').style.display = mode === 'file' ? 'block' : 'none';
+      document.getElementById('mode-topic').style.display = mode === 'topic' ? 'block' : 'none';
+      document.getElementById('tab-file').classList.toggle('active', mode === 'file');
+      document.getElementById('tab-topic').classList.toggle('active', mode === 'topic');
+    };
+
+    // --- MODE 1: File upload ---
+    const uploadArea = document.getElementById('upload-area');
+    const fileInput = document.getElementById('file-input');
+
+    uploadArea.addEventListener('dragover', e => { e.preventDefault(); uploadArea.classList.add('dragover'); });
+    uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
+    uploadArea.addEventListener('drop', e => {
+      e.preventDefault();
+      uploadArea.classList.remove('dragover');
+      const f = e.dataTransfer?.files?.[0];
+      if (f) handleFile(f);
+    });
+    uploadArea.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', e => {
+      const f = e.target.files?.[0];
+      if (f) handleFile(f);
+    });
+
+    function handleFile(file) {
+      if (!file.name.match(/\.(md|markdown)$/i)) {
+        alert('Please upload a .md or .markdown file');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = e => {
+        markdownContent = e.target.result;
+
+        // Auto-fill title
+        const name = file.name.replace(/\.(md|markdown)$/i, '');
+        document.getElementById('title').value = name.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+
+        // Count topics (## headings)
+        const topicCount = (markdownContent.match(/^## /gm) || []).length;
+        document.getElementById('topic-count').textContent = `${topicCount} topic${topicCount !== 1 ? 's' : ''} detected`;
+
+        // Preview
+        document.getElementById('markdown-preview').innerHTML = simpleMarkdownToHTML(markdownContent);
+
+        uploadArea.style.display = 'none';
+        document.getElementById('form-section').style.display = 'block';
+      };
+      reader.readAsText(file);
+    }
+
+    function simpleMarkdownToHTML(md) {
+      return md
+        .replace(/```[\w]*\n([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
+        .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+        .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+        .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/`(.+?)`/g, '<code>$1</code>')
+        .replace(/\n\n/g, '</p><p>')
+        .replace(/^(?!<[h|p|u|o|l|b|p])/gm, '')
+        .replace(/^(.+)$/gm, (line) => line.startsWith('<') ? line : `<p>${line}</p>`);
+    }
+
+    document.getElementById('submit-btn').addEventListener('click', async () => {
+      const category = document.getElementById('category').value;
+      const title = document.getElementById('title').value.trim();
+      const description = document.getElementById('description').value.trim();
+      const tags = document.getElementById('tags').value.split(',').map(t => t.trim()).filter(Boolean);
+
+      if (!category || !title || !markdownContent) {
+        alert('Category and title are required');
+        return;
+      }
+
+      const btn = document.getElementById('submit-btn');
+      btn.disabled = true;
+      btn.textContent = 'Creating...';
+
+      const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+
+      const res = await fetch('/api/docs/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ category, title, slug, description, content: markdownContent, tags }),
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        window.location.href = `/instructor/docs/edit/${data.draft._id}`;
+      } else {
+        alert('Error: ' + data.error);
+        btn.disabled = false;
+        btn.textContent = 'Open in Editor';
+      }
+    });
+
+    // --- MODE 2: Add single topic ---
+    let topicFileContent = '';
+
+    const targetDoc = document.getElementById('target-doc');
+    targetDoc.addEventListener('change', () => {
+      document.getElementById('new-doc-fields').style.display = targetDoc.value === 'new' ? 'block' : 'none';
+    });
+
+    // Content mode switching
+    function switchContentMode(mode) {
+      document.getElementById('write-mode').style.display = mode === 'write' ? 'block' : 'none';
+      document.getElementById('upload-mode').style.display = mode === 'upload' ? 'block' : 'none';
+      document.getElementById('btn-write').classList.toggle('active', mode === 'write');
+      document.getElementById('btn-upload-topic').classList.toggle('active', mode === 'upload');
+      
+      // Clear content when switching
+      if (mode === 'write') {
+        topicFileContent = '';
+      } else {
+        document.getElementById('topic-content').value = '';
+      }
+    }
+
+    document.getElementById('btn-write').addEventListener('click', () => switchContentMode('write'));
+    document.getElementById('btn-upload-topic').addEventListener('click', () => switchContentMode('upload'));
+
+    // Topic file upload
+    const topicUploadArea = document.getElementById('topic-upload-area');
+    const topicFileInput = document.getElementById('topic-file-input');
+
+    document.getElementById('browse-topic-file').addEventListener('click', () => topicFileInput.click());
+    topicUploadArea.addEventListener('click', () => topicFileInput.click());
+    topicUploadArea.addEventListener('dragover', e => e.preventDefault());
+    topicUploadArea.addEventListener('drop', e => {
+      e.preventDefault();
+      const f = e.dataTransfer?.files?.[0];
+      if (f) handleTopicFile(f);
+    });
+    topicFileInput.addEventListener('change', e => {
+      const f = e.target.files?.[0];
+      if (f) handleTopicFile(f);
+    });
+
+    function handleTopicFile(file) {
+      if (!file.name.match(/\.(md|markdown)$/i)) {
+        alert('Please upload a .md or .markdown file');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = e => {
+        topicFileContent = e.target.result;
+        
+        // Auto-fill topic title from filename if empty
+        if (!document.getElementById('topic-title').value) {
+          const name = file.name.replace(/\.(md|markdown)$/i, '');
+          document.getElementById('topic-title').value = name.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+        }
+        
+        // Show file info
+        document.getElementById('topic-file-name').textContent = file.name;
+        document.getElementById('topic-upload-area').style.display = 'none';
+        document.getElementById('topic-file-preview').style.display = 'block';
+      };
+      reader.readAsText(file);
+    }
+
+    document.getElementById('clear-topic-file').addEventListener('click', () => {
+      topicFileContent = '';
+      topicFileInput.value = '';
+      document.getElementById('topic-upload-area').style.display = 'block';
+      document.getElementById('topic-file-preview').style.display = 'none';
+    });
+
+    document.getElementById('add-topic-btn').addEventListener('click', async () => {
+      const target = targetDoc.value;
+      const topicTitle = document.getElementById('topic-title').value.trim();
+      
+      // Get content from either textarea or uploaded file
+      const isUploadMode = document.getElementById('upload-mode').style.display !== 'none';
+      const topicContent = isUploadMode ? topicFileContent : document.getElementById('topic-content').value.trim();
+
+      if (!topicTitle) { alert('Topic title is required'); return; }
+
+      const btn = document.getElementById('add-topic-btn');
+      btn.disabled = true;
+      btn.textContent = 'Saving...';
+
+      let draftId = target;
+
+      // Create new doc first if needed
+      if (target === 'new') {
+        const newCat = document.getElementById('new-category').value;
+        const newTitle = document.getElementById('new-doc-title').value.trim();
+        if (!newCat || !newTitle) { alert('Category and doc title are required for a new doc'); btn.disabled = false; btn.textContent = 'Add Topic & Open Editor'; return; }
+
+        const slug = newTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+        const res = await fetch('/api/docs/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ category: newCat, title: newTitle, slug, description: '', content: '', tags: [] }),
+        });
+        const data = await res.json();
+        if (!data.success) { alert('Error creating doc: ' + data.error); btn.disabled = false; btn.textContent = 'Add Topic & Open Editor'; return; }
+        draftId = data.draft._id;
+      }
+
+      // Add the topic
+      const content = topicContent || `## ${topicTitle}\n\nStart writing here...`;
+      const res = await fetch('/api/docs/add-topic', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ draftId, title: topicTitle, content }),
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        window.location.href = `/instructor/docs/edit/${draftId}`;
+      } else {
+        alert('Error: ' + data.error);
+        btn.disabled = false;
+        btn.textContent = 'Add Topic & Open Editor';
+      }
+    });
+  </script>
+</BaseLayout>

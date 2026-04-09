@@ -3,6 +3,23 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 import Header from '../components/Header.astro';
 import { getCollection } from 'astro:content';
 
+// Homepage needs to check auth, so server-rendered
+// But we can optimize with caching
+export const prerender = false;
+
+// Check if user is logged in
+const token = Astro.cookies.get('auth_token')?.value;
+const isLoggedIn = !!token;
+
+// For non-logged-in users, this could be cached
+// For logged-in users, it's personalized
+Astro.response.headers.set(
+  'Cache-Control',
+  isLoggedIn 
+    ? 'private, no-cache' // Don't cache for logged-in users
+    : 'public, max-age=300, s-maxage=600' // Cache for 5-10 min for guests
+);
+
 const allDocs = await getCollection('docs');
 const featuredDocs = allDocs.filter(doc => doc.data.featured);
 const categories = [...new Set(allDocs.map(doc => doc.data.category))];
@@ -23,9 +40,15 @@ const categories = [...new Set(allDocs.map(doc => doc.data.category))];
             where you can explore in-depth technical documentation and master programming concepts deeply.
           </p>
           <div class="hero-buttons">
-            <a href="/docs/javascript/arrays" class="btn btn-primary">
-              Explore Documentation
-            </a>
+            {allDocs.length > 0 ? (
+              <a href={`/docs/${allDocs[0].id}`} class="btn btn-primary">
+                Explore Documentation
+              </a>
+            ) : (
+              <span class="btn btn-primary" style="opacity: 0.5; cursor: not-allowed;">
+                No docs available yet
+              </span>
+            )}
             <a href="https://sheryians.com/" target="_blank" class="btn btn-secondary">
               Visit Sheryians
             </a>
@@ -48,7 +71,7 @@ const categories = [...new Set(allDocs.map(doc => doc.data.category))];
             return (
               <a href={`/docs/${categoryDocs[0].id}`} class="card">
                 <h3>{category}</h3>
-                <p>{categoryDocs.length} {categoryDocs.length === 1 ? 'article' : 'articles'}</p>
+                <p>{categoryDocs.length} {categoryDocs.length === 1 ? 'guide' : 'guides'}</p>
                 <span class="card-link">Explore →</span>
               </a>
             );

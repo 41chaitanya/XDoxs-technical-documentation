@@ -1,0 +1,369 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Header from '../../components/Header.astro';
+import { verifyToken } from '../../lib/auth/jwt';
+
+export const prerender = false;
+
+const token = Astro.cookies.get('auth_token')?.value;
+
+if (!token) {
+  return Astro.redirect('/login');
+}
+
+const payload = verifyToken(token);
+
+if (!payload || payload.role !== 'super_admin') {
+  return Astro.redirect('/');
+}
+
+const userEmail = payload.email;
+---
+
+<BaseLayout title="Admin Dashboard - XDoxs">
+  <Header />
+  
+  <div class="admin-container">
+    <div class="admin-header">
+      <div>
+        <h1>Admin Dashboard</h1>
+        <p class="user-info">Welcome, {userEmail}</p>
+      </div>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-value" id="pending-count">0</div>
+        <div class="stat-label">Pending Review</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="approved-count">0</div>
+        <div class="stat-label">Approved</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="rejected-count">0</div>
+        <div class="stat-label">Rejected</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="published-count">0</div>
+        <div class="stat-label">Published</div>
+      </div>
+    </div>
+
+    <div class="docs-section">
+      <h2>Pending Documentation</h2>
+      <div class="docs-list" id="pending-docs">
+        <div class="loading">Loading...</div>
+      </div>
+    </div>
+
+    <div class="docs-section">
+      <h2>All Documentation</h2>
+      <div class="docs-list" id="all-docs">
+        <div class="loading">Loading...</div>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    .admin-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 2rem;
+      min-height: calc(100vh - 64px);
+    }
+
+    .admin-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 2rem;
+    }
+
+    .admin-header h1 {
+      margin: 0;
+      font-size: 2rem;
+      color: var(--text-primary);
+    }
+
+    .user-info {
+      color: var(--text-secondary);
+      margin: 0.5rem 0 0 0;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 3rem;
+    }
+
+    .stat-card {
+      background: var(--bg-secondary);
+      padding: 1.5rem;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 2.5rem;
+      font-weight: bold;
+      color: var(--primary);
+      margin-bottom: 0.5rem;
+    }
+
+    .stat-label {
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+    }
+
+    .docs-section {
+      margin-bottom: 3rem;
+    }
+
+    .docs-section h2 {
+      margin-bottom: 1.5rem;
+      color: var(--text-primary);
+    }
+
+    .docs-list {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 2rem;
+      color: var(--text-secondary);
+    }
+
+    .doc-card {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem;
+      transition: all 0.2s;
+    }
+
+    .doc-card:hover {
+      border-color: var(--primary);
+      transform: translateY(-2px);
+    }
+
+    .doc-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: start;
+      margin-bottom: 1rem;
+    }
+
+    .doc-title {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin: 0 0 0.5rem 0;
+    }
+
+    .doc-meta {
+      display: flex;
+      gap: 1rem;
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+      margin-bottom: 1rem;
+    }
+
+    .doc-status {
+      display: inline-block;
+      padding: 0.25rem 0.75rem;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 500;
+      text-transform: uppercase;
+    }
+
+    .status-pending_review {
+      background: oklch(0.9 0.05 31.08 / 50%);
+      color: oklch(0.4 0.15 31.08);
+    }
+
+    .status-approved {
+      background: oklch(0.9 0.05 120 / 50%);
+      color: oklch(0.4 0.15 120);
+    }
+
+    .status-rejected {
+      background: oklch(0.9 0.05 0 / 50%);
+      color: oklch(0.4 0.15 0);
+    }
+
+    .doc-actions {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 1rem;
+    }
+
+    .btn-small {
+      padding: 0.5rem 1rem;
+      border-radius: 6px;
+      font-size: 0.875rem;
+      text-decoration: none;
+      transition: all 0.2s;
+      border: none;
+      cursor: pointer;
+      font-weight: 500;
+    }
+
+    .btn-review {
+      background: var(--primary);
+      color: white;
+    }
+
+    .btn-review:hover {
+      background: var(--primary-hover);
+    }
+
+    .btn-remove {
+      background: transparent;
+      color: oklch(0.577 0.245 27.325);
+      border: 1px solid oklch(0.577 0.245 27.325);
+    }
+
+    .btn-remove:hover {
+      background: oklch(0.577 0.245 27.325);
+      color: white;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 3rem;
+      color: var(--text-secondary);
+    }
+  </style>
+
+  <script>
+    async function loadDocs() {
+      try {
+        const response = await fetch('/api/docs/list');
+        const data = await response.json();
+
+        if (!data.success) {
+          throw new Error(data.error);
+        }
+
+        const drafts = data.drafts || [];
+
+        // Update stats
+        const stats = {
+          pending_review: 0,
+          approved: 0,
+          rejected: 0,
+          published: 0,
+        };
+
+        drafts.forEach((draft: any) => {
+          if (stats[draft.status as keyof typeof stats] !== undefined) {
+            stats[draft.status as keyof typeof stats]++;
+          }
+        });
+
+        document.getElementById('pending-count')!.textContent = String(stats.pending_review);
+        document.getElementById('approved-count')!.textContent = String(stats.approved);
+        document.getElementById('rejected-count')!.textContent = String(stats.rejected);
+        document.getElementById('published-count')!.textContent = String(stats.published);
+
+        // Render pending docs
+        const pendingDocs = drafts.filter((d: any) => d.status === 'pending_review');
+        const pendingList = document.getElementById('pending-docs')!;
+
+        if (pendingDocs.length === 0) {
+          pendingList.innerHTML = `
+            <div class="empty-state">
+              <p>No pending documentation to review</p>
+            </div>
+          `;
+        } else {
+          pendingList.innerHTML = pendingDocs.map((draft: any) => `
+            <div class="doc-card">
+              <div class="doc-header">
+                <div>
+                  <h3 class="doc-title">${draft.title}</h3>
+                  <div class="doc-meta">
+                    <span>By: ${draft.instructorEmail}</span>
+                    <span>Category: ${draft.category}</span>
+                    <span>Submitted: ${new Date(draft.updatedAt).toLocaleDateString()}</span>
+                  </div>
+                </div>
+                <span class="doc-status status-${draft.status}">${draft.status.replace('_', ' ')}</span>
+              </div>
+              ${draft.description ? `<p style="color: var(--text-secondary); margin-bottom: 1rem;">${draft.description}</p>` : ''}
+              <div class="doc-actions">
+                <a href="/admin/review/${draft._id}" class="btn-small btn-review">Review & Approve</a>
+              </div>
+            </div>
+          `).join('');
+        }
+
+        // Render all docs
+        const allList = document.getElementById('all-docs')!;
+        allList.innerHTML = drafts.map((draft: any) => `
+          <div class="doc-card">
+            <div class="doc-header">
+              <div>
+                <h3 class="doc-title">${draft.title}</h3>
+                <div class="doc-meta">
+                  <span>By: ${draft.instructorEmail}</span>
+                  <span>Category: ${draft.category}</span>
+                  <span>Updated: ${new Date(draft.updatedAt).toLocaleDateString()}</span>
+                </div>
+              </div>
+              <span class="doc-status status-${draft.status}">${draft.status.replace('_', ' ')}</span>
+            </div>
+            ${draft.description ? `<p style="color: var(--text-secondary); margin-bottom: 1rem;">${draft.description}</p>` : ''}
+            <div class="doc-actions">
+              <a href="/admin/review/${draft._id}" class="btn-small btn-review">View Details</a>
+              ${draft.status === 'approved' ? `<button class="btn-small btn-remove" onclick="removeFromPublic('${draft._id}', this)">Remove from Public</button>` : ''}
+            </div>
+          </div>
+        `).join('');
+      } catch (error) {
+        console.error('Error loading docs:', error);
+        document.getElementById('pending-docs')!.innerHTML = `
+          <div class="empty-state">
+            <p>Error loading documentation. Please try again.</p>
+          </div>
+        `;
+      }
+    }
+
+    loadDocs();
+
+    async function removeFromPublic(draftId: string, btn: HTMLButtonElement) {
+      if (!confirm('Remove this doc from public view? The .md file will be deleted and status reset to draft.')) return;
+      btn.disabled = true;
+      btn.textContent = 'Removing...';
+      try {
+        const res = await fetch('/api/admin/unpublish', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ draftId }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          loadDocs();
+        } else {
+          alert('Error: ' + data.error);
+          btn.disabled = false;
+          btn.textContent = 'Remove from Public';
+        }
+      } catch {
+        alert('Error removing doc');
+        btn.disabled = false;
+        btn.textContent = 'Remove from Public';
+      }
+    }
+
+    (window as any).removeFromPublic = removeFromPublic;
+  </script>
+</BaseLayout>

@@ -1,5 +1,6 @@
 ---
 import { getCollection } from 'astro:content';
+import { verifyToken } from '../lib/auth/jwt';
 
 const allDocs = await getCollection('docs');
 
@@ -14,6 +15,32 @@ const docsByCategory = allDocs.reduce((acc, doc) => {
 }, {} as Record<string, typeof allDocs>);
 
 const categories = Object.keys(docsByCategory).sort();
+
+// Check if user is logged in
+const token = Astro.cookies.get('auth_token')?.value;
+let user: { userId: string; email: string; role: string } | null = null;
+
+console.log('🎨 Header rendering on server');
+console.log('🍪 Token from cookie:', token ? 'Token exists' : 'No token');
+
+if (token) {
+  try {
+    user = verifyToken(token);
+    console.log('✅ User verified:', user.email, 'Role:', user.role);
+  } catch (error) {
+    console.log('❌ Token verification failed:', error);
+  }
+} else {
+  console.log('⚠️ No auth token found in cookies');
+}
+
+const isLoggedIn = !!user;
+const userEmail = user?.email || '';
+const userRole = user?.role || '';
+const isInstructorOrAdmin = user?.role === 'instructor' || user?.role === 'super_admin';
+
+console.log('👤 Is logged in:', isLoggedIn);
+console.log('📧 User email:', userEmail || 'N/A');
 ---
 
 <header class="header">
@@ -51,7 +78,145 @@ const categories = Object.keys(docsByCategory).sort();
         
         <a href="https://github.com/yourusername/xdoxs" target="_blank">GitHub</a>
         
-        <a href="/login" class="login-btn">Login</a>
+        <!-- Theme Selector (Sun Icon) -->
+        <div class="theme-selector">
+          <button class="theme-btn" aria-label="Change theme">
+            <svg class="theme-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="5"></circle>
+              <line x1="12" y1="1" x2="12" y2="3"></line>
+              <line x1="12" y1="21" x2="12" y2="23"></line>
+              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+              <line x1="1" y1="12" x2="3" y2="12"></line>
+              <line x1="21" y1="12" x2="23" y2="12"></line>
+              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+              <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+            </svg>
+          </button>
+          
+          <div class="theme-dropdown">
+            <div class="theme-options">
+              <button class="theme-option" data-hue="165.37" title="Teal">
+                <span class="theme-circle" style="background: oklch(0.6207 0.1332 165.37 / 92.9%)"></span>
+              </button>
+              <button class="theme-option" data-hue="0" title="Gray">
+                <span class="theme-circle" style="background: oklch(0.6207 0.1332 0 / 92.9%)"></span>
+              </button>
+              <button class="theme-option" data-hue="31.08" title="Orange">
+                <span class="theme-circle" style="background: oklch(0.6207 0.1332 31.08 / 92.9%)"></span>
+              </button>
+              <button class="theme-option" data-hue="71.47" title="Yellow">
+                <span class="theme-circle" style="background: oklch(0.6207 0.1332 71.47 / 92.9%)"></span>
+              </button>
+              <button class="theme-option" data-hue="120" title="Green">
+                <span class="theme-circle" style="background: oklch(0.6207 0.1332 120 / 92.9%)"></span>
+              </button>
+              <button class="theme-option" data-hue="240" title="Blue">
+                <span class="theme-circle" style="background: oklch(0.6207 0.1332 240 / 92.9%)"></span>
+              </button>
+              <button class="theme-option" data-hue="280" title="Purple">
+                <span class="theme-circle" style="background: oklch(0.6207 0.1332 280 / 92.9%)"></span>
+              </button>
+              <button class="theme-option" data-hue="330" title="Pink">
+                <span class="theme-circle" style="background: oklch(0.6207 0.1332 330 / 92.9%)"></span>
+              </button>
+            </div>
+          </div>
+        </div>
+        
+        {isLoggedIn ? (
+          <!-- User Profile -->
+          <div class="user-profile" style="display: block;">
+            <button class="profile-btn" aria-label="User profile">
+              <div class="profile-avatar">
+                {userEmail.charAt(0).toUpperCase()}
+              </div>
+            </button>
+            
+            <div class="profile-dropdown">
+              <div class="profile-info">
+                <div class="profile-name">{userEmail}</div>
+                <div class="profile-role">{userRole.replace('_', ' ')}</div>
+              </div>
+              <div class="profile-divider"></div>
+              <div class="profile-links">
+                {isInstructorOrAdmin && (
+                  <a href="/instructor/dashboard" class="profile-link">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <rect x="3" y="3" width="7" height="7"></rect>
+                      <rect x="14" y="3" width="7" height="7"></rect>
+                      <rect x="14" y="14" width="7" height="7"></rect>
+                      <rect x="3" y="14" width="7" height="7"></rect>
+                    </svg>
+                    Instructor Dashboard
+                  </a>
+                )}
+                {user?.role === 'super_admin' && (
+                  <a href="/admin/dashboard" class="profile-link">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                      <path d="M2 17l10 5 10-5"></path>
+                      <path d="M2 12l10 5 10-5"></path>
+                    </svg>
+                    Admin Dashboard
+                  </a>
+                )}
+                <button class="profile-link logout-btn" id="logout-btn">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                    <polyline points="16 17 21 12 16 7"></polyline>
+                    <line x1="21" y1="12" x2="9" y2="12"></line>
+                  </svg>
+                  Logout
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <!-- User Profile (hidden by default for static pages) -->
+          <div class="user-profile" style="display: none;">
+            <button class="profile-btn" aria-label="User profile">
+              <div class="profile-avatar">U</div>
+            </button>
+            
+            <div class="profile-dropdown">
+              <div class="profile-info">
+                <div class="profile-name"></div>
+                <div class="profile-role"></div>
+              </div>
+              <div class="profile-divider"></div>
+              <div class="profile-links">
+                <a href="/instructor/dashboard" class="profile-link dashboard-link" style="display: none;">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="3" width="7" height="7"></rect>
+                    <rect x="14" y="3" width="7" height="7"></rect>
+                    <rect x="14" y="14" width="7" height="7"></rect>
+                    <rect x="3" y="14" width="7" height="7"></rect>
+                  </svg>
+                  Instructor Dashboard
+                </a>
+                <a href="/admin/dashboard" class="profile-link admin-link" style="display: none;">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                    <path d="M2 17l10 5 10-5"></path>
+                    <path d="M2 12l10 5 10-5"></path>
+                  </svg>
+                  Admin Dashboard
+                </a>
+                <button class="profile-link logout-btn" id="logout-btn">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                    <polyline points="16 17 21 12 16 7"></polyline>
+                    <line x1="21" y1="12" x2="9" y2="12"></line>
+                  </svg>
+                  Logout
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        <a href="/login" class="login-btn" style={isLoggedIn ? 'display: none;' : 'display: block;'}>Login</a>
       </div>
     </nav>
   </div>
@@ -257,6 +422,222 @@ const categories = Object.keys(docsByCategory).sort();
     transform: translateX(4px);
   }
 
+  /* Theme Selector */
+  .theme-selector {
+    position: relative;
+  }
+
+  .theme-btn {
+    background: none;
+    border: none;
+    color: var(--text-primary);
+    cursor: pointer;
+    padding: 0.5rem;
+    border-radius: var(--radius-sm);
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .theme-btn:hover {
+    background: var(--bg-secondary);
+  }
+
+  .theme-icon {
+    transition: all 0.3s ease;
+    stroke: var(--primary);
+    filter: drop-shadow(0 0 4px var(--primary));
+  }
+
+  .theme-btn:hover .theme-icon {
+    transform: rotate(45deg);
+    filter: drop-shadow(0 0 8px var(--primary));
+  }
+
+  .theme-dropdown {
+    position: absolute;
+    top: calc(100% + 0.5rem);
+    right: 0;
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-lg);
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.2s ease;
+    padding: 0.75rem;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .theme-dropdown {
+      background: var(--bg-secondary);
+    }
+  }
+
+  .theme-selector:hover .theme-dropdown {
+    opacity: 1;
+    visibility: visible;
+  }
+
+  .theme-options {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.5rem;
+  }
+
+  .theme-option {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0.25rem;
+    border-radius: 50%;
+    transition: all 0.2s ease;
+  }
+
+  .theme-option:hover {
+    transform: scale(1.1);
+  }
+
+  .theme-circle {
+    display: block;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    transition: all 0.2s ease;
+  }
+
+  .theme-option:hover .theme-circle {
+    border-color: var(--text-primary);
+    box-shadow: 0 0 0 2px var(--bg-primary), 0 0 0 4px var(--border);
+  }
+
+  /* User Profile */
+  .user-profile {
+    position: relative;
+  }
+
+  .profile-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    border-radius: 50%;
+    transition: all 0.2s ease;
+  }
+
+  .profile-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--primary);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 0.9rem;
+    transition: all 0.2s ease;
+  }
+
+  .profile-btn:hover .profile-avatar {
+    transform: scale(1.05);
+    box-shadow: 0 0 0 3px var(--primary-light);
+  }
+
+  .profile-dropdown {
+    position: absolute;
+    top: calc(100% + 0.5rem);
+    right: 0;
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-lg);
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.2s ease;
+    min-width: 220px;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .profile-dropdown {
+      background: var(--bg-secondary);
+    }
+  }
+
+  .user-profile:hover .profile-dropdown {
+    opacity: 1;
+    visibility: visible;
+  }
+
+  .profile-info {
+    padding: 1rem;
+  }
+
+  .profile-name {
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    margin-bottom: 0.5rem;
+    word-break: break-all;
+  }
+
+  .profile-role {
+    font-size: 0.75rem;
+    text-transform: capitalize;
+    background: var(--primary-light);
+    color: var(--primary);
+    padding: 0.25rem 0.5rem;
+    border-radius: 12px;
+    display: inline-block;
+    font-weight: 500;
+  }
+
+  .profile-divider {
+    height: 1px;
+    background: var(--border);
+    margin: 0 0.5rem;
+  }
+
+  .profile-links {
+    padding: 0.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .profile-link {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.625rem 0.75rem;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    border-radius: var(--radius-sm);
+    transition: all 0.2s ease;
+    background: none;
+    border: none;
+    cursor: pointer;
+    width: 100%;
+    text-align: left;
+    font-family: inherit;
+  }
+
+  .profile-link:hover {
+    background: var(--primary-light);
+    color: var(--primary);
+  }
+
+  .profile-link svg {
+    flex-shrink: 0;
+  }
+
+  .logout-btn:hover {
+    background: oklch(0.9 0.05 0 / 50%);
+    color: oklch(0.577 0.245 27.325);
+  }
+
   @media (max-width: 768px) {
     .nav-links {
       gap: 1rem;
@@ -274,3 +655,108 @@ const categories = Object.keys(docsByCategory).sort();
     }
   }
 </style>
+
+<script>
+  // Theme selector
+  const themeOptions = document.querySelectorAll('.theme-option');
+  const root = document.documentElement;
+
+  // Load saved theme
+  const savedHue = localStorage.getItem('theme-hue') || '165.37';
+  applyTheme(savedHue);
+
+  themeOptions.forEach(option => {
+    option.addEventListener('click', () => {
+      const hue = option.getAttribute('data-hue');
+      if (hue) {
+        applyTheme(hue);
+        localStorage.setItem('theme-hue', hue);
+      }
+    });
+  });
+
+  function applyTheme(hue: string) {
+    root.style.setProperty('--primary', `oklch(0.6207 0.1332 ${hue} / 92.9%)`);
+    root.style.setProperty('--primary-hover', `oklch(0.5607 0.1432 ${hue} / 92.9%)`);
+    root.style.setProperty('--primary-light', `oklch(0.9 0.05 ${hue} / 92.9%)`);
+    root.style.setProperty('--primary-dark', `oklch(0.4 0.15 ${hue})`);
+  }
+
+  // Logout functionality
+  const logoutBtn = document.getElementById('logout-btn');
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', async () => {
+      console.log('🚪 Logout clicked');
+      try {
+        await fetch('/api/auth/logout', { method: 'POST' });
+        console.log('✅ Logout successful, redirecting...');
+        window.location.href = '/';
+      } catch (error) {
+        console.error('❌ Logout error:', error);
+        window.location.href = '/';
+      }
+    });
+  }
+  
+  // Client-side auth check for static pages
+  // This runs on every page to sync login state
+  async function checkAuthState() {
+    try {
+      const response = await fetch('/api/auth/me', {
+        credentials: 'include'
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.user) {
+          // User is logged in - show profile, hide login
+          const loginBtn = document.querySelector('.login-btn');
+          const userProfile = document.querySelector('.user-profile');
+          
+          if (loginBtn) loginBtn.style.display = 'none';
+          if (userProfile) {
+            userProfile.style.display = 'block';
+            // Update profile info
+            const profileName = userProfile.querySelector('.profile-name');
+            const profileRole = userProfile.querySelector('.profile-role');
+            const profileAvatar = userProfile.querySelector('.profile-avatar');
+            const dashboardLink = userProfile.querySelector('.dashboard-link');
+            
+            if (profileName) profileName.textContent = data.user.email;
+            if (profileRole) profileRole.textContent = data.user.role.replace('_', ' ');
+            if (profileAvatar) profileAvatar.textContent = data.user.email.charAt(0).toUpperCase();
+            
+            // Show dashboard link for instructor/admin
+            if (dashboardLink && (data.user.role === 'instructor' || data.user.role === 'super_admin')) {
+              dashboardLink.style.display = 'flex';
+            }
+            
+            // Show admin link for super_admin
+            const adminLink = userProfile.querySelector('.admin-link');
+            if (adminLink && data.user.role === 'super_admin') {
+              adminLink.style.display = 'flex';
+            }
+          }
+        }
+      } else {
+        // User not logged in - show login, hide profile
+        const loginBtn = document.querySelector('.login-btn');
+        const userProfile = document.querySelector('.user-profile');
+        
+        if (loginBtn) loginBtn.style.display = 'block';
+        if (userProfile) userProfile.style.display = 'none';
+      }
+    } catch (error) {
+      console.error('Auth check error:', error);
+    }
+  }
+  
+  // Run auth check on page load
+  checkAuthState();
+  
+  // Debug: Log header state
+  console.log('🎨 Header loaded');
+  console.log('🍪 Cookies:', document.cookie);
+  console.log('👤 Profile button exists:', !!document.querySelector('.profile-btn'));
+  console.log('🔐 Login button exists:', !!document.querySelector('.login-btn'));
+</script>

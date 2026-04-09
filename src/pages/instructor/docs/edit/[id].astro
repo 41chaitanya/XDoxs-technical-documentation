@@ -1,0 +1,1038 @@
+---
+import BaseLayout from '../../../../layouts/BaseLayout.astro';
+import Header from '../../../../components/Header.astro';
+import { verifyToken } from '../../../../lib/auth/jwt';
+import { getDocDraft } from '../../../../lib/db/docs';
+import { splitMarkdownIntoTopics } from '../../../../lib/markdown/splitter';
+import { renderMarkdown } from '../../../../lib/markdown/render';
+
+export const prerender = false;
+
+const token = Astro.cookies.get('auth_token')?.value;
+if (!token) return Astro.redirect('/login');
+
+const payload = verifyToken(token);
+if (!payload || (payload.role !== 'instructor' && payload.role !== 'super_admin')) {
+  return Astro.redirect('/login');
+}
+
+const { id } = Astro.params;
+if (!id) return Astro.redirect('/instructor/dashboard');
+
+let draft = await getDocDraft(id);
+if (!draft) return Astro.redirect('/instructor/dashboard');
+
+if (draft.instructorId !== payload.userId && payload.role !== 'super_admin') {
+  return Astro.redirect('/instructor/dashboard');
+}
+
+// Auto-split if no topics yet
+if (!draft.topics || draft.topics.length === 0) {
+  const topics = splitMarkdownIntoTopics(draft.content || '');
+  await fetch(`${Astro.url.origin}/api/docs/update`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', 'Cookie': `auth_token=${token}` },
+    body: JSON.stringify({ draftId: id, topics, content: draft.content }),
+  });
+  draft.topics = topics;
+}
+
+const topics = draft.topics || [];
+const firstTopic = topics[0];
+const initialHtml = firstTopic ? await renderMarkdown(firstTopic.content) : '';
+---
+<BaseLayout title={`Edit: ${draft.title} - XDoxs`}>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" />
+  <Header />
+
+  <div class="editor-layout">
+    <!-- LEFT: Topics sidebar -->
+    <aside class="topics-sidebar">
+      <div class="sidebar-top">
+        <div class="doc-title-wrap">
+          <span class="doc-title">{draft.title}</span>
+          <span class="cat-badge">{draft.category}</span>
+        </div>
+      </div>
+
+      <div class="topics-list" id="topics-list">
+        {topics.map((topic, i) => (
+          <div class="topic-item" data-id={topic.id} data-index={i} draggable="true">
+            <span class="topic-drag">⠿</span>
+            <span class="topic-name">{topic.title}</span>
+            <div class="topic-controls">
+              <button class="ctrl-btn ctrl-del btn-delete" title="Delete">✕</button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div class="add-topic-actions">
+        <button class="add-topic-btn" id="add-topic-btn">+ Add Topic</button>
+        <button class="upload-topic-btn" id="upload-topic-btn" title="Upload .md file as topic">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+          </svg>
+          Upload Topic
+        </button>
+      </div>
+      <input type="file" id="topic-file-input" accept=".md,.markdown" hidden>
+
+      <div class="sidebar-actions">
+        <button class="btn-save" id="save-btn">Save</button>
+        {draft.status === 'draft' || draft.status === 'rejected' ? (
+          <button class="btn-submit" id="submit-btn">Submit for Review</button>
+        ) : draft.status === 'approved' ? (
+          <button class="btn-republish" id="republish-btn">Republish Changes</button>
+        ) : (
+          <span class="status-note">Status: {draft.status.replace('_', ' ')}</span>
+        )}
+      </div>
+    </aside>
+
+    <!-- CENTER: Editor / Preview -->
+    <main class="editor-main">
+      <div class="editor-topbar">
+        <span class="active-topic-title" id="active-topic-title">{firstTopic?.title || 'No topics'}</span>
+        <div class="view-toggle">
+          <button class="toggle-btn active" id="btn-edit">Edit</button>
+          <button class="toggle-btn" id="btn-preview">Preview</button>
+        </div>
+      </div>
+
+      <!-- Toolbar (edit mode only) -->
+      <div class="toolbar" id="toolbar">
+        <button class="tool-btn" data-fmt="h2" title="Heading 2">H2</button>
+        <button class="tool-btn" data-fmt="h3" title="Heading 3">H3</button>
+        <div class="tool-sep"></div>
+        <button class="tool-btn" data-fmt="bold" title="Bold"><strong>B</strong></button>
+        <button class="tool-btn" data-fmt="italic" title="Italic"><em>I</em></button>
+        <button class="tool-btn" data-fmt="code" title="Inline code">&#96;</button>
+        <div class="tool-sep"></div>
+        <button class="tool-btn" data-fmt="codeblock" title="Code block">{ }</button>
+        <button class="tool-btn" data-fmt="ul" title="Bullet list">• List</button>
+        <button class="tool-btn" data-fmt="ol" title="Numbered list">1. List</button>
+        <button class="tool-btn" data-fmt="blockquote" title="Blockquote">" "</button>
+        <button class="tool-btn" data-fmt="hr" title="Divider">—</button>
+      </div>
+
+      <!-- Markdown textarea (edit mode) -->
+      <textarea class="md-editor" id="md-editor" spellcheck="false"></textarea>
+
+      <!-- Preview (preview mode) -->
+      <div class="md-preview markdown-body" id="md-preview" style="display:none">
+        <Fragment set:html={initialHtml} />
+      </div>
+    </main>
+
+    <!-- RIGHT: Metadata panel -->
+    <aside class="meta-panel">
+      <h3>Metadata</h3>
+      <div class="meta-group">
+        <label>Description</label>
+        <textarea id="meta-desc" rows="3">{draft.description}</textarea>
+      </div>
+      <div class="meta-group">
+        <label>Tags</label>
+        <input type="text" id="meta-tags" value={draft.tags?.join(', ') || ''} placeholder="js, beginner" />
+      </div>
+      <div class="meta-group">
+        <label>Category</label>
+        <select id="meta-category">
+          {['javascript','python','html','devops','react','nodejs'].map(c => (
+            <option value={c} selected={draft.category === c}>{c}</option>
+          ))}
+        </select>
+      </div>
+    </aside>
+  </div>
+
+  <!-- Add topic modal -->
+  <div class="modal" id="add-modal" style="display:none">
+    <div class="modal-box">
+      <h3>Add New Topic</h3>
+      <input type="text" id="new-topic-title" placeholder="Topic title e.g. Variables" />
+      <div class="modal-actions">
+        <button class="btn-cancel" id="cancel-add-topic">Cancel</button>
+        <button class="btn-confirm" id="confirm-add-topic">Add</button>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    * { box-sizing: border-box; }
+    
+    .editor-layout {
+      display: grid;
+      grid-template-columns: 280px 1fr 260px;
+      height: calc(100vh - 64px);
+      overflow: hidden;
+    }
+
+    /* LEFT SIDEBAR */
+    .topics-sidebar {
+      background: var(--bg-secondary);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .sidebar-top {
+      padding: 1.25rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .doc-title-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .doc-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      line-height: 1.3;
+    }
+
+    .cat-badge {
+      display: inline-block;
+      width: fit-content;
+      padding: 0.2rem 0.6rem;
+      background: var(--primary-light);
+      color: var(--primary);
+      border-radius: 999px;
+      font-size: 0.7rem;
+      font-weight: 500;
+      text-transform: uppercase;
+    }
+
+    .topics-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0.5rem 0;
+    }
+
+    .topic-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.6rem 1rem;
+      cursor: pointer;
+      transition: all 0.15s;
+      border-left: 3px solid transparent;
+    }
+
+    .topic-item:hover .topic-name {
+      text-shadow: 0 0 8px var(--primary), 0 0 12px var(--primary);
+    }
+
+    .topic-item.active {
+      border-left-color: var(--primary);
+    }
+
+    .topic-item.active .topic-name {
+      color: var(--primary);
+    }
+
+    .topic-item.dragging {
+      opacity: 0.5;
+    }
+
+    .topic-item.drag-over {
+      border-top: 2px solid var(--primary);
+    }
+
+    .topic-drag {
+      color: var(--text-secondary);
+      cursor: grab;
+      font-size: 1rem;
+    }
+
+    .topic-name {
+      flex: 1;
+      font-size: 0.875rem;
+      color: var(--text-primary);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .topic-controls {
+      display: none;
+      gap: 0.2rem;
+    }
+
+    .topic-item:hover .topic-controls {
+      display: flex;
+    }
+
+    .ctrl-btn {
+      padding: 0.15rem 0.35rem;
+      background: var(--bg-primary);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      font-size: 0.75rem;
+      cursor: pointer;
+      color: var(--text-secondary);
+      transition: all 0.15s;
+    }
+
+    .ctrl-btn:hover {
+      background: var(--primary);
+      color: white;
+      border-color: var(--primary);
+    }
+
+    .ctrl-del:hover {
+      background: oklch(0.577 0.245 27.325);
+      border-color: oklch(0.577 0.245 27.325);
+    }
+
+    .add-topic-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      margin: 0.75rem 1rem;
+    }
+
+    .add-topic-btn, .upload-topic-btn {
+      padding: 0.6rem;
+      background: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.875rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+    }
+
+    .add-topic-btn:hover, .upload-topic-btn:hover {
+      background: var(--primary-hover);
+    }
+
+    .upload-topic-btn {
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      border: 1px solid var(--border);
+    }
+
+    .upload-topic-btn:hover {
+      background: var(--bg-secondary);
+      border-color: var(--primary);
+    }
+
+    .upload-topic-btn svg {
+      flex-shrink: 0;
+    }
+
+    .sidebar-actions {
+      padding: 1rem;
+      border-top: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .btn-save, .btn-submit, .btn-republish {
+      padding: 0.65rem;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.875rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-save {
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      border: 1px solid var(--border);
+    }
+
+    .btn-save:hover {
+      border-color: var(--primary);
+    }
+
+    .btn-submit {
+      background: oklch(0.6 0.15 120);
+      color: white;
+    }
+
+    .btn-submit:hover {
+      background: oklch(0.5 0.15 120);
+    }
+
+    .btn-republish {
+      background: oklch(0.6 0.15 240);
+      color: white;
+    }
+
+    .btn-republish:hover {
+      background: oklch(0.5 0.15 240);
+    }
+
+    .status-note {
+      text-align: center;
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      padding: 0.5rem;
+    }
+
+    /* CENTER EDITOR */
+    .editor-main {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: var(--bg-primary);
+    }
+
+    .editor-topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.75rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-secondary);
+    }
+
+    .active-topic-title {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .view-toggle {
+      display: flex;
+      gap: 0;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+
+    .toggle-btn {
+      padding: 0.4rem 1rem;
+      background: var(--bg-primary);
+      color: var(--text-secondary);
+      border: none;
+      font-size: 0.85rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .toggle-btn.active {
+      background: var(--primary);
+      color: white;
+    }
+
+    .toolbar {
+      display: flex;
+      gap: 0.25rem;
+      padding: 0.6rem 1rem;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-secondary);
+      flex-wrap: wrap;
+    }
+
+    .tool-btn {
+      padding: 0.35rem 0.65rem;
+      background: var(--bg-primary);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      color: var(--text-primary);
+      transition: all 0.15s;
+    }
+
+    .tool-btn:hover {
+      background: var(--primary-light);
+      border-color: var(--primary);
+    }
+
+    .tool-sep {
+      width: 1px;
+      background: var(--border);
+      margin: 0 0.25rem;
+    }
+
+    .md-editor {
+      flex: 1;
+      padding: 1.5rem;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      border: none;
+      font-family: 'Courier New', Consolas, Monaco, monospace;
+      font-size: 0.95rem;
+      line-height: 1.7;
+      resize: none;
+      overflow-y: auto;
+    }
+
+    .md-editor:focus {
+      outline: none;
+    }
+
+    .md-preview {
+      flex: 1;
+      padding: 2rem;
+      overflow-y: auto;
+      line-height: 1.8;
+    }
+
+    /* RIGHT PANEL */
+    .meta-panel {
+      background: var(--bg-secondary);
+      border-left: 1px solid var(--border);
+      padding: 1.25rem;
+      overflow-y: auto;
+    }
+
+    .meta-panel h3 {
+      font-size: 1rem;
+      margin-bottom: 1rem;
+      color: var(--text-primary);
+    }
+
+    .meta-group {
+      margin-bottom: 1rem;
+    }
+
+    .meta-group label {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 500;
+      color: var(--text-secondary);
+      margin-bottom: 0.4rem;
+    }
+
+    .meta-group input,
+    .meta-group textarea,
+    .meta-group select {
+      width: 100%;
+      padding: 0.5rem;
+      background: var(--bg-primary);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text-primary);
+      font-size: 0.875rem;
+      font-family: inherit;
+    }
+
+    .meta-group textarea {
+      resize: vertical;
+    }
+
+    /* MODAL */
+    .modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: oklch(0 0 0 / 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+    }
+
+    .modal-box {
+      background: var(--bg-primary);
+      padding: 1.5rem;
+      border-radius: 12px;
+      width: 90%;
+      max-width: 400px;
+      border: 1px solid var(--border);
+    }
+
+    .modal-box h3 {
+      margin-bottom: 1rem;
+      color: var(--text-primary);
+    }
+
+    .modal-box input {
+      width: 100%;
+      padding: 0.65rem;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text-primary);
+      font-size: 0.95rem;
+      margin-bottom: 1rem;
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 0.5rem;
+      justify-content: flex-end;
+    }
+
+    .btn-cancel, .btn-confirm {
+      padding: 0.5rem 1rem;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.875rem;
+      font-weight: 500;
+      cursor: pointer;
+    }
+
+    .btn-cancel {
+      background: var(--bg-secondary);
+      color: var(--text-primary);
+      border: 1px solid var(--border);
+    }
+
+    .btn-confirm {
+      background: var(--primary);
+      color: white;
+    }
+
+    /* MARKDOWN PREVIEW STYLES */
+    .markdown-body h1, .markdown-body h2, .markdown-body h3, .markdown-body h4 {
+      margin-top: 1.5rem;
+      margin-bottom: 0.75rem;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+    .markdown-body h1 { font-size: 2rem; }
+    .markdown-body h2 { font-size: 1.5rem; border-bottom: 1px solid var(--border); padding-bottom: 0.4rem; }
+    .markdown-body h3 { font-size: 1.25rem; }
+    .markdown-body h4 { font-size: 1.1rem; }
+    .markdown-body p { margin-bottom: 1rem; }
+    .markdown-body code {
+      background: oklch(0.2 0 0);
+      color: oklch(0.9 0 0);
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+      font-family: 'Courier New', monospace;
+      font-size: 0.9em;
+    }
+    .markdown-body pre {
+      background: oklch(0.15 0 0);
+      color: oklch(0.9 0 0);
+      padding: 1.25rem;
+      border-radius: 8px;
+      overflow-x: auto;
+      margin: 1.25rem 0;
+    }
+    .markdown-body pre code {
+      background: none;
+      padding: 0;
+      font-size: 0.875rem;
+    }
+    .markdown-body ul, .markdown-body ol {
+      margin: 1rem 0;
+      padding-left: 2rem;
+    }
+    .markdown-body li { margin: 0.4rem 0; }
+    .markdown-body blockquote {
+      border-left: 4px solid var(--primary);
+      padding-left: 1rem;
+      margin: 1.25rem 0;
+      color: var(--text-secondary);
+      font-style: italic;
+    }
+    .markdown-body a { color: var(--primary); text-decoration: none; }
+    .markdown-body a:hover { text-decoration: underline; }
+    .markdown-body hr { border: none; border-top: 2px solid var(--border); margin: 1.5rem 0; }
+    .markdown-body table { width: 100%; border-collapse: collapse; margin: 1.25rem 0; }
+    .markdown-body th, .markdown-body td { border: 1px solid var(--border); padding: 0.6rem; text-align: left; }
+    .markdown-body th { background: var(--bg-secondary); font-weight: 600; }
+    .markdown-body img { max-width: 100%; height: auto; border-radius: 8px; margin: 1.25rem 0; }
+
+    @media (max-width: 1200px) {
+      .editor-layout { grid-template-columns: 240px 1fr 220px; }
+    }
+
+    @media (max-width: 900px) {
+      .editor-layout { grid-template-columns: 1fr; }
+      .topics-sidebar, .meta-panel { display: none; }
+    }
+  </style>
+
+  <script define:vars={{ draftId: draft._id, topics: topics.map(t => ({ id: t.id, title: t.title, content: t.content })) }}>
+    let currentTopicId = topics[0]?.id;
+    let currentView = 'edit';
+    let saveTimeout;
+
+    // Select topic
+    function selectTopic(topicId) {
+      currentTopicId = topicId;
+      const topic = topics.find(t => t.id === topicId);
+      if (!topic) return;
+
+      document.getElementById('active-topic-title').textContent = topic.title;
+      document.getElementById('md-editor').value = topic.content;
+
+      document.querySelectorAll('.topic-item').forEach(el => {
+        el.classList.toggle('active', el.dataset.id === topicId);
+      });
+
+      if (currentView === 'preview') renderPreview();
+    }
+
+    // View toggle
+    function setView(view) {
+      currentView = view;
+      document.getElementById('btn-edit').classList.toggle('active', view === 'edit');
+      document.getElementById('btn-preview').classList.toggle('active', view === 'preview');
+      document.getElementById('toolbar').style.display = view === 'edit' ? 'flex' : 'none';
+      document.getElementById('md-editor').style.display = view === 'edit' ? 'block' : 'none';
+      document.getElementById('md-preview').style.display = view === 'preview' ? 'block' : 'none';
+
+      if (view === 'preview') renderPreview();
+    }
+
+    async function renderPreview() {
+      const content = document.getElementById('md-editor').value;
+      const res = await fetch('/api/docs/render-topic', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content }),
+      });
+      const data = await res.json();
+      if (data.html) {
+        document.getElementById('md-preview').innerHTML = data.html;
+      }
+    }
+
+    // Toolbar formatting
+    function fmt(type) {
+      const editor = document.getElementById('md-editor');
+      const start = editor.selectionStart;
+      const end = editor.selectionEnd;
+      const selected = editor.value.substring(start, end);
+      let replacement = '';
+
+      switch(type) {
+        case 'h2': replacement = '## ' + (selected || 'Heading'); break;
+        case 'h3': replacement = '### ' + (selected || 'Heading'); break;
+        case 'bold': replacement = '**' + (selected || 'bold text') + '**'; break;
+        case 'italic': replacement = '*' + (selected || 'italic text') + '*'; break;
+        case 'code': replacement = '`' + (selected || 'code') + '`'; break;
+        case 'codeblock': replacement = '\n```javascript\n' + (selected || 'code here') + '\n```\n'; break;
+        case 'ul': replacement = '- ' + (selected || 'list item'); break;
+        case 'ol': replacement = '1. ' + (selected || 'list item'); break;
+        case 'blockquote': replacement = '> ' + (selected || 'quote'); break;
+        case 'hr': replacement = '\n---\n'; break;
+      }
+
+      editor.value = editor.value.substring(0, start) + replacement + editor.value.substring(end);
+      editor.focus();
+      editor.setSelectionRange(start, start + replacement.length);
+      autoSave();
+    }
+
+    // Auto-save on edit
+    document.getElementById('md-editor').addEventListener('input', autoSave);
+
+    function autoSave() {
+      clearTimeout(saveTimeout);
+      saveTimeout = setTimeout(() => {
+        const topic = topics.find(t => t.id === currentTopicId);
+        if (topic) {
+          topic.content = document.getElementById('md-editor').value;
+        }
+      }, 1000);
+    }
+
+    // Event delegation for topic list
+    document.getElementById('topics-list').addEventListener('click', (e) => {
+      const topicItem = e.target.closest('.topic-item');
+      if (!topicItem) return;
+
+      const topicId = topicItem.dataset.id;
+
+      if (e.target.classList.contains('topic-name') || e.target.classList.contains('topic-drag')) {
+        selectTopic(topicId);
+      } else if (e.target.classList.contains('btn-delete')) {
+        deleteTopic(topicId);
+      }
+    });
+
+    // Drag and drop for topics
+    let draggedItem = null;
+
+    document.getElementById('topics-list').addEventListener('dragstart', (e) => {
+      if (e.target.classList.contains('topic-item')) {
+        draggedItem = e.target;
+        e.target.classList.add('dragging');
+      }
+    });
+
+    document.getElementById('topics-list').addEventListener('dragend', (e) => {
+      if (e.target.classList.contains('topic-item')) {
+        e.target.classList.remove('dragging');
+        document.querySelectorAll('.topic-item').forEach(item => {
+          item.classList.remove('drag-over');
+        });
+      }
+    });
+
+    document.getElementById('topics-list').addEventListener('dragover', (e) => {
+      e.preventDefault();
+      const afterElement = getDragAfterElement(e.clientY);
+      const draggable = document.querySelector('.dragging');
+      
+      if (afterElement == null) {
+        document.getElementById('topics-list').appendChild(draggable);
+      } else {
+        document.getElementById('topics-list').insertBefore(draggable, afterElement);
+      }
+    });
+
+    document.getElementById('topics-list').addEventListener('drop', async (e) => {
+      e.preventDefault();
+      
+      // Get new order
+      const items = Array.from(document.querySelectorAll('.topic-item'));
+      const newOrder = items.map(item => item.dataset.id);
+      
+      // Update topics array order
+      const reordered = newOrder.map((id, index) => {
+        const topic = topics.find(t => t.id === id);
+        return { ...topic, order: index };
+      });
+      
+      // Save to server
+      await fetch('/api/docs/reorder-topics', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ draftId, topicIds: newOrder }),
+      });
+      
+      // Update local topics array
+      topics.length = 0;
+      topics.push(...reordered);
+    });
+
+    function getDragAfterElement(y) {
+      const draggableElements = [...document.querySelectorAll('.topic-item:not(.dragging)')];
+      
+      return draggableElements.reduce((closest, child) => {
+        const box = child.getBoundingClientRect();
+        const offset = y - box.top - box.height / 2;
+        
+        if (offset < 0 && offset > closest.offset) {
+          return { offset: offset, element: child };
+        } else {
+          return closest;
+        }
+      }, { offset: Number.NEGATIVE_INFINITY }).element;
+    }
+
+    // Toolbar event delegation
+    document.getElementById('toolbar').addEventListener('click', (e) => {
+      if (e.target.classList.contains('tool-btn')) {
+        const fmtType = e.target.dataset.fmt;
+        if (fmtType) fmt(fmtType);
+      }
+    });
+
+    // View toggle buttons
+    document.getElementById('btn-edit').addEventListener('click', () => setView('edit'));
+    document.getElementById('btn-preview').addEventListener('click', () => setView('preview'));
+
+    // Save button
+    document.getElementById('save-btn').addEventListener('click', async () => {
+      const btn = document.getElementById('save-btn');
+      btn.disabled = true;
+      btn.textContent = 'Saving...';
+
+      const fullContent = topics.map(t => t.content).join('\n\n');
+      const description = document.getElementById('meta-desc').value;
+      const tags = document.getElementById('meta-tags').value.split(',').map(t => t.trim()).filter(Boolean);
+      const category = document.getElementById('meta-category').value;
+
+      const res = await fetch('/api/docs/update', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ draftId, topics, content: fullContent, description, tags, category }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        btn.textContent = 'Saved ✓';
+        setTimeout(() => { btn.textContent = 'Save'; btn.disabled = false; }, 1500);
+      } else {
+        alert('Error saving: ' + data.error);
+        btn.textContent = 'Save';
+        btn.disabled = false;
+      }
+    });
+
+    // Submit for review
+    const submitBtn = document.getElementById('submit-btn');
+    if (submitBtn) {
+      submitBtn.addEventListener('click', async () => {
+        if (!confirm('Submit this documentation for admin review?')) return;
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Submitting...';
+
+        const res = await fetch('/api/docs/update', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ draftId, status: 'pending_review' }),
+        });
+
+        const data = await res.json();
+        if (data.success) {
+          alert('Submitted for review!');
+          window.location.href = '/instructor/dashboard';
+        } else {
+          alert('Error: ' + data.error);
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Submit for Review';
+        }
+      });
+    }
+
+    // Republish changes
+    const republishBtn = document.getElementById('republish-btn');
+    if (republishBtn) {
+      republishBtn.addEventListener('click', async () => {
+        if (!confirm('Submit changes for admin review? The doc will need admin approval before being republished.')) return;
+        republishBtn.disabled = true;
+        republishBtn.textContent = 'Submitting...';
+
+        // First save current changes
+        const fullContent = topics.map(t => t.content).join('\n\n');
+        const description = document.getElementById('meta-desc').value;
+        const tags = document.getElementById('meta-tags').value.split(',').map(t => t.trim()).filter(Boolean);
+        const category = document.getElementById('meta-category').value;
+
+        const saveRes = await fetch('/api/docs/update', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ draftId, topics, content: fullContent, description, tags, category }),
+        });
+
+        const saveData = await saveRes.json();
+        if (!saveData.success) {
+          alert('Error saving: ' + saveData.error);
+          republishBtn.disabled = false;
+          republishBtn.textContent = 'Republish Changes';
+          return;
+        }
+
+        // Then change status to pending_review
+        const res = await fetch('/api/docs/update', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ draftId, status: 'pending_review' }),
+        });
+
+        const data = await res.json();
+        if (data.success) {
+          alert('Changes submitted for admin review!');
+          window.location.href = '/instructor/dashboard';
+        } else {
+          alert('Error: ' + data.error);
+          republishBtn.disabled = false;
+          republishBtn.textContent = 'Republish Changes';
+        }
+      });
+    }
+
+    // Delete topic
+    async function deleteTopic(topicId) {
+      if (topics.length === 1) { alert('Cannot delete the last topic'); return; }
+      if (!confirm('Delete this topic?')) return;
+
+      await fetch('/api/docs/delete-topic', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ draftId, topicId }),
+      });
+
+      location.reload();
+    }
+
+    // Add topic modal
+    document.getElementById('add-topic-btn').addEventListener('click', () => {
+      document.getElementById('add-modal').style.display = 'flex';
+      document.getElementById('new-topic-title').value = '';
+      document.getElementById('new-topic-title').focus();
+    });
+
+    document.getElementById('cancel-add-topic').addEventListener('click', () => {
+      document.getElementById('add-modal').style.display = 'none';
+    });
+
+    document.getElementById('confirm-add-topic').addEventListener('click', async () => {
+      const title = document.getElementById('new-topic-title').value.trim();
+      if (!title) return;
+
+      const res = await fetch('/api/docs/add-topic', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ draftId, title, content: `## ${title}\n\nStart writing here...` }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        location.reload();
+      } else {
+        alert('Error: ' + data.error);
+      }
+    });
+
+    // Upload topic from file
+    const topicFileInput = document.getElementById('topic-file-input');
+    
+    document.getElementById('upload-topic-btn').addEventListener('click', () => {
+      topicFileInput.click();
+    });
+
+    topicFileInput.addEventListener('change', async (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      if (!file.name.match(/\.(md|markdown)$/i)) {
+        alert('Please upload a .md or .markdown file');
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        const content = event.target.result;
+        
+        // Extract title from filename
+        const title = file.name
+          .replace(/\.(md|markdown)$/i, '')
+          .replace(/[-_]/g, ' ')
+          .replace(/\b\w/g, c => c.toUpperCase());
+
+        // Add the topic
+        const res = await fetch('/api/docs/add-topic', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ draftId, title, content }),
+        });
+
+        const data = await res.json();
+        if (data.success) {
+          location.reload();
+        } else {
+          alert('Error: ' + data.error);
+        }
+      };
+      
+      reader.readAsText(file);
+      
+      // Reset input so same file can be uploaded again
+      topicFileInput.value = '';
+    });
+
+    // Init
+    if (topics.length > 0) selectTopic(topics[0].id);
+  </script>
+</BaseLayout>

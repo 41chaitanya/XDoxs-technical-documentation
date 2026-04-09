@@ -1,5 +1,8 @@
-// Temporary in-memory user storage
-// TODO: Replace with actual database (Supabase/PostgreSQL)
+// MongoDB-based user storage
+import { getDb } from '../db/mongodb';
+import { COLLECTIONS, type User as DBUser } from '../db/models';
+import { hashPassword } from './password';
+import { ObjectId } from 'mongodb';
 
 export interface User {
   id: string;
@@ -7,26 +10,59 @@ export interface User {
   passwordHash: string;
   fullName: string;
   role: 'super_admin' | 'instructor' | 'student';
-  isActive: boolean;
   createdAt: Date;
 }
 
-// In-memory storage (will be replaced with database)
-const users: Map<string, User> = new Map();
+// Initialize default users
+async function initializeDefaultUsers() {
+  const db = await getDb();
+  const usersCollection = db.collection<DBUser>(COLLECTIONS.USERS);
+  
+  const defaultUsers = [
+    {
+      email: 'admin@xdoxs.com',
+      passwordHash: await hashPassword('ramram'),
+      fullName: 'Super Admin',
+      role: 'super_admin' as const,
+      createdAt: new Date(),
+    },
+    {
+      email: 'instructor@xdoxs.com',
+      passwordHash: await hashPassword('ramram'),
+      fullName: 'Instructor User',
+      role: 'instructor' as const,
+      createdAt: new Date(),
+    },
+    {
+      email: 'student@xdoxs.com',
+      passwordHash: await hashPassword('ramram'),
+      fullName: 'Student User',
+      role: 'student' as const,
+      createdAt: new Date(),
+    },
+  ];
+  
+  for (const user of defaultUsers) {
+    const exists = await usersCollection.findOne({ email: user.email });
+    if (!exists) {
+      await usersCollection.insertOne(user);
+    }
+  }
+}
 
-// Initialize with a super admin (for testing)
-const SUPER_ADMIN_EMAIL = 'admin@xdoxs.com';
-const SUPER_ADMIN_PASSWORD_HASH = '$2a$10$rZ5qH8vK9X.YvZ5qH8vK9O7Z5qH8vK9X.YvZ5qH8vK9O7Z5qH8vK9'; // "admin123"
+// Initialize on module load
+initializeDefaultUsers().catch(console.error);
 
-users.set(SUPER_ADMIN_EMAIL, {
-  id: 'super-admin-1',
-  email: SUPER_ADMIN_EMAIL,
-  passwordHash: SUPER_ADMIN_PASSWORD_HASH,
-  fullName: 'Super Admin',
-  role: 'super_admin',
-  isActive: true,
-  createdAt: new Date(),
-});
+function mapDbUserToUser(dbUser: DBUser): User {
+  return {
+    id: dbUser._id?.toString() || '',
+    email: dbUser.email,
+    passwordHash: dbUser.passwordHash,
+    fullName: dbUser.fullName,
+    role: dbUser.role,
+    createdAt: dbUser.createdAt,
+  };
+}
 
 export async function createUser(data: {
   email: string;
@@ -34,46 +70,61 @@ export async function createUser(data: {
   fullName: string;
   role?: 'student' | 'instructor';
 }): Promise<User> {
-  if (users.has(data.email)) {
+  const db = await getDb();
+  const usersCollection = db.collection<DBUser>(COLLECTIONS.USERS);
+  
+  const exists = await usersCollection.findOne({ email: data.email });
+  if (exists) {
     throw new Error('User already exists');
   }
 
-  const user: User = {
-    id: `user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+  const newUser: DBUser = {
     email: data.email,
     passwordHash: data.passwordHash,
     fullName: data.fullName,
     role: data.role || 'student',
-    isActive: true,
     createdAt: new Date(),
   };
 
-  users.set(data.email, user);
-  return user;
+  const result = await usersCollection.insertOne(newUser);
+  newUser._id = result.insertedId.toString();
+  
+  return mapDbUserToUser(newUser);
 }
 
 export async function findUserByEmail(email: string): Promise<User | null> {
-  return users.get(email) || null;
+  const db = await getDb();
+  const usersCollection = db.collection<DBUser>(COLLECTIONS.USERS);
+  
+  const user = await usersCollection.findOne({ email });
+  return user ? mapDbUserToUser(user) : null;
 }
 
 export async function findUserById(id: string): Promise<User | null> {
-  for (const user of users.values()) {
-    if (user.id === id) {
-      return user;
-    }
-  }
-  return null;
+  const db = await getDb();
+  const usersCollection = db.collection<DBUser>(COLLECTIONS.USERS);
+  
+  const user = await usersCollection.findOne({ _id: new ObjectId(id) });
+  return user ? mapDbUserToUser(user) : null;
 }
 
 export async function updateUserRole(userId: string, role: 'instructor' | 'student'): Promise<User | null> {
-  const user = await findUserById(userId);
-  if (!user) return null;
+  const db = await getDb();
+  const usersCollection = db.collection<DBUser>(COLLECTIONS.USERS);
   
-  user.role = role;
-  users.set(user.email, user);
-  return user;
+  const result = await usersCollection.findOneAndUpdate(
+    { _id: new ObjectId(userId) },
+    { $set: { role } },
+    { returnDocument: 'after' }
+  );
+  
+  return result ? mapDbUserToUser(result) : null;
 }
 
 export async function getAllUsers(): Promise<User[]> {
-  return Array.from(users.values());
+  const db = await getDb();
+  const usersCollection = db.collection<DBUser>(COLLECTIONS.USERS);
+  
+  const users = await usersCollection.find({}).toArray();
+  return users.map(mapDbUserToUser);
 }

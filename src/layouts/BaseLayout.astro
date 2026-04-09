@@ -33,6 +33,18 @@ const canonicalURL = new URL(Astro.url.pathname, Astro.site);
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
+    
+    <!-- Global Theme Script - Runs immediately to prevent flash -->
+    <script is:inline>
+      (function() {
+        const savedHue = localStorage.getItem('theme-hue') || '165.37';
+        const root = document.documentElement;
+        root.style.setProperty('--primary', `oklch(0.6207 0.1332 ${savedHue} / 92.9%)`);
+        root.style.setProperty('--primary-hover', `oklch(0.5607 0.1432 ${savedHue} / 92.9%)`);
+        root.style.setProperty('--primary-light', `oklch(0.9 0.05 ${savedHue} / 92.9%)`);
+        root.style.setProperty('--primary-dark', `oklch(0.4 0.15 ${savedHue})`);
+      })();
+    </script>
   </head>
   <body>
     <slot />

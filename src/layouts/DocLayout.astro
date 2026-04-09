@@ -1,8 +1,6 @@
 ---
 import BaseLayout from './BaseLayout.astro';
 import Header from '../components/Header.astro';
-import DocsSidebar from '../components/DocsSidebar.astro';
-import TableOfContents from '../components/TableOfContents.astro';
 
 interface Props {
   title: string;
@@ -17,9 +15,13 @@ interface Props {
     text: string;
   }>;
   docId: string;
+  topics?: Array<{
+    slug: string;
+    text: string;
+  }>;
 }
 
-const { title, description, date, author, category, tags, headings, docId } = Astro.props;
+const { title, description, date, author, category, tags, headings, docId, topics = [] } = Astro.props;
 
 const jsonLd = {
   '@context': 'https://schema.org',
@@ -39,7 +41,31 @@ const jsonLd = {
   <Header />
   
   <div class="doc-container">
-    <DocsSidebar currentCategory={category} currentDocId={docId} />
+    <!-- Left Sidebar: Topics Navigation -->
+    <aside class="topics-sidebar">
+      <div class="sidebar-content">
+        <div class="doc-info">
+          <h2 class="doc-title">{title}</h2>
+          <span class="category-badge">{category}</span>
+        </div>
+        
+        {topics.length > 0 && (
+          <nav class="topics-nav">
+            <h3 class="topics-heading">Topics</h3>
+            <ul class="topics-list">
+              {topics.map((topic, index) => (
+                <li>
+                  <a href={`#${topic.slug}`} class="topic-link" data-slug={topic.slug}>
+                    <span class="topic-number">{index + 1}</span>
+                    <span class="topic-title">{topic.text}</span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </nav>
+        )}
+      </div>
+    </aside>
     
     <main class="doc-main">
       <nav class="breadcrumb">
@@ -61,8 +87,6 @@ const jsonLd = {
             <time datetime={date.toISOString()}>
               {date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
             </time>
-            <span>•</span>
-            <span class="category-badge">{category}</span>
           </div>
           
           <div class="tags">
@@ -77,8 +101,6 @@ const jsonLd = {
         </div>
       </article>
     </main>
-    
-    <TableOfContents headings={headings} />
   </div>
   
   <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
@@ -89,11 +111,128 @@ const jsonLd = {
     display: flex;
   }
 
+  /* Topics Sidebar */
+  .topics-sidebar {
+    width: 280px;
+    background: var(--bg-secondary);
+    border-right: 1px solid var(--border);
+    height: calc(100vh - 64px);
+    position: sticky;
+    top: 64px;
+    overflow-y: auto;
+  }
+
+  .sidebar-content {
+    padding: 1.5rem;
+  }
+
+  .doc-info {
+    margin-bottom: 1.5rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .doc-title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    margin-bottom: 0.75rem;
+    color: var(--text-primary);
+    line-height: 1.3;
+  }
+
+  .category-badge {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    background: var(--primary-light);
+    color: var(--primary);
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    text-transform: capitalize;
+  }
+
+  .topics-heading {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .topics-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .topics-list li {
+    margin-bottom: 0.25rem;
+  }
+
+  .topic-link {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.65rem 0.75rem;
+    border-radius: 6px;
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    transition: all 0.2s;
+    border-left: 3px solid transparent;
+  }
+
+  .topic-link:hover {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+  }
+
+  .topic-link:hover .topic-title {
+    text-shadow: 0 0 8px var(--primary);
+  }
+
+  .topic-link.active {
+    background: var(--bg-primary);
+    border-left-color: var(--primary);
+  }
+
+  .topic-link.active .topic-title {
+    color: var(--primary);
+    font-weight: 500;
+  }
+
+  .topic-number {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    background: var(--bg-tertiary);
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    flex-shrink: 0;
+  }
+
+  .topic-link.active .topic-number {
+    background: var(--primary);
+    color: white;
+  }
+
+  .topic-title {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Main Content */
   .doc-main {
     flex: 1;
-    max-width: 900px;
+    max-width: 1100px;
     margin: 0 auto;
-    padding: 2rem 1.5rem;
+    padding: 2rem 2rem;
   }
 
   .breadcrumb {
@@ -152,10 +291,6 @@ const jsonLd = {
     margin-bottom: 1rem;
   }
 
-  .category-badge {
-    text-transform: capitalize;
-  }
-
   .tags {
     display: flex;
     flex-wrap: wrap;
@@ -179,10 +314,23 @@ const jsonLd = {
     margin-top: 2rem;
     padding-bottom: 0.5rem;
     border-bottom: 1px solid var(--border);
+    scroll-margin-top: 80px;
   }
 
   .doc-content :global(h3) {
     margin-top: 1.5rem;
+  }
+
+  @media (max-width: 1200px) {
+    .topics-sidebar {
+      width: 240px;
+    }
+  }
+
+  @media (max-width: 1024px) {
+    .topics-sidebar {
+      display: none;
+    }
   }
 
   @media (max-width: 768px) {
@@ -195,3 +343,47 @@ const jsonLd = {
     }
   }
 </style>
+
+<script>
+  // Smooth scroll and active state for topic links
+  document.addEventListener('DOMContentLoaded', () => {
+    const topicLinks = document.querySelectorAll('.topic-link');
+    
+    // Smooth scroll on click
+    topicLinks.forEach(link => {
+      link.addEventListener('click', (e) => {
+        e.preventDefault();
+        const slug = link.getAttribute('data-slug');
+        const target = document.getElementById(slug);
+        if (target) {
+          target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          // Update URL without jumping
+          history.pushState(null, '', `#${slug}`);
+        }
+      });
+    });
+    
+    // Highlight active topic on scroll
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          const id = entry.target.id;
+          topicLinks.forEach(link => {
+            if (link.getAttribute('data-slug') === id) {
+              link.classList.add('active');
+            } else {
+              link.classList.remove('active');
+            }
+          });
+        }
+      });
+    }, {
+      rootMargin: '-80px 0px -80% 0px'
+    });
+    
+    // Observe all H2 headings
+    document.querySelectorAll('.doc-content h2[id]').forEach(heading => {
+      observer.observe(heading);
+    });
+  });
+</script>
