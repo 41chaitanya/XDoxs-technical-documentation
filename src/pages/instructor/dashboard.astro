@@ -1,5 +1,6 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
+import Header from '../../components/Header.astro';
 import { verifyToken } from '../../lib/auth/jwt';
 
 const token = Astro.cookies.get('auth_token')?.value;
@@ -19,6 +20,7 @@ const userRole = payload.role;
 ---
 
 <BaseLayout title="Instructor Dashboard - XDoxs">
+  <Header />
   <div class="dashboard-container">
     <div class="dashboard-header">
       <div>

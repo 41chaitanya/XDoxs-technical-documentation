@@ -1,35 +1,51 @@
 ---
-import { getCollection, render } from 'astro:content';
+import { getDb } from '../../lib/db/mongodb';
+import { COLLECTIONS } from '../../lib/db/models';
+import { renderMarkdown } from '../../lib/markdown/render';
+import { splitMarkdownIntoTopics, extractHeadingsFromTopic } from '../../lib/markdown/splitter';
 import DocLayout from '../../layouts/DocLayout.astro';
 
-export const prerender = true;
+export const prerender = false;
 
-export async function getStaticPaths() {
-  const docs = await getCollection('docs');
-  
-  return docs.map(doc => ({
-    params: { slug: doc.id },
-    props: { doc },
-  }));
-}
+const { slug } = Astro.params;
+const slugPath = Array.isArray(slug) ? slug.join('/') : (slug ?? '');
 
-const { doc } = Astro.props;
-const { Content, headings } = await render(doc);
+const parts = slugPath.split('/');
+const category = parts[0];
+const docSlug = parts[1];
 
-// Extract H2 headings as topics for sidebar navigation
-const topics = headings.filter(h => h.depth === 2);
+if (!category || !docSlug) return Astro.redirect('/');
+
+const db = await getDb();
+const draft = await db.collection(COLLECTIONS.DOC_DRAFTS).findOne({
+  category,
+  slug: docSlug,
+  status: 'approved',
+});
+
+if (!draft) return Astro.redirect('/');
+
+// Use pre-rendered HTML if available (fast path), otherwise render on-the-fly (fallback)
+const htmlContent = draft.renderedHtml ?? await renderMarkdown(draft.content);
+
+// Extract headings for sidebar/TOC
+const topics = splitMarkdownIntoTopics(draft.content);
+const headings = topics.flatMap(t => extractHeadingsFromTopic(t.content));
+const h2Topics = headings.filter(h => h.depth === 2);
+
+const publishedAt = draft.publishedAt ? new Date(draft.publishedAt) : new Date(draft.updatedAt);
 ---
 
 <DocLayout
-  title={doc.data.title}
-  description={doc.data.description}
-  date={doc.data.date}
-  author={doc.data.author}
-  category={doc.data.category}
-  tags={doc.data.tags}
+  title={draft.title}
+  description={draft.description || ''}
+  date={publishedAt}
+  author={draft.instructorEmail}
+  category={draft.category}
+  tags={draft.tags || []}
   headings={headings}
-  docId={doc.id}
-  topics={topics}
+  docId={slugPath}
+  topics={h2Topics}
 >
-  <Content />
+  <div set:html={htmlContent} />
 </DocLayout>

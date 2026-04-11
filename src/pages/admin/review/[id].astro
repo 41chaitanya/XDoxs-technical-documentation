@@ -535,7 +535,7 @@ const htmlContent = await renderMarkdown(currentTopic.content);
     }
   </style>
 
-  <script define:vars={{ draftId: draft._id, topics }}>
+  <script define:vars={{ draftId: String(draft._id), topics }}>
     const approveBtn = document.getElementById('approve-btn');
     const rejectBtn = document.getElementById('reject-btn');
     const publishBtn = document.getElementById('publish-btn');

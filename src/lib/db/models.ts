@@ -26,6 +26,7 @@ export interface DocDraft {
   slug: string;
   description: string;
   content: string; // Full markdown content
+  renderedHtml?: string; // Pre-rendered HTML — generated at publish time
   topics?: Topic[]; // Split topics from markdown
   tags: string[];
   status: 'draft' | 'pending_review' | 'approved' | 'rejected' | 'needs_changes';

@@ -14,19 +14,9 @@ export function splitMarkdownIntoTopics(markdown: string): Topic[] {
   // Split by H2 headings (##)
   const sections = markdown.split(/^## /gm);
   
-  // First section is usually intro (before first H2)
-  const intro = sections[0].trim();
-  if (intro) {
-    topics.push({
-      id: 'intro',
-      title: 'Introduction',
-      slug: 'introduction',
-      content: intro,
-      order: 0
-    });
-  }
-  
-  // Process remaining sections (each starts with H2)
+  // Process all sections (each starts with H2)
+  // Note: any content before the first ## is intentionally ignored —
+  // the uploaded .md file should include its own introduction as a ## section
   for (let i = 1; i < sections.length; i++) {
     const section = sections[i];
     const lines = section.split('\n');
@@ -43,7 +33,7 @@ export function splitMarkdownIntoTopics(markdown: string): Topic[] {
         title,
         slug,
         content: `## ${title}\n\n${content}`,
-        order: i
+        order: i - 1
       });
     }
   }

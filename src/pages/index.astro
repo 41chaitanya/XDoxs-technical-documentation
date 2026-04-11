@@ -1,28 +1,27 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import Header from '../components/Header.astro';
-import { getCollection } from 'astro:content';
+import { getDb } from '../lib/db/mongodb';
+import { COLLECTIONS } from '../lib/db/models';
 
-// Homepage needs to check auth, so server-rendered
-// But we can optimize with caching
 export const prerender = false;
 
-// Check if user is logged in
 const token = Astro.cookies.get('auth_token')?.value;
 const isLoggedIn = !!token;
 
-// For non-logged-in users, this could be cached
-// For logged-in users, it's personalized
 Astro.response.headers.set(
   'Cache-Control',
-  isLoggedIn 
-    ? 'private, no-cache' // Don't cache for logged-in users
-    : 'public, max-age=300, s-maxage=600' // Cache for 5-10 min for guests
+  isLoggedIn
+    ? 'private, no-cache'
+    : 'public, max-age=60'
 );
 
-const allDocs = await getCollection('docs');
-const featuredDocs = allDocs.filter(doc => doc.data.featured);
-const categories = [...new Set(allDocs.map(doc => doc.data.category))];
+const db = await getDb();
+const allDocs = await db.collection(COLLECTIONS.DOC_DRAFTS)
+  .find({ status: 'approved' })
+  .toArray();
+
+const categories = [...new Set(allDocs.map((doc: any) => doc.category))];
 ---
 
 <BaseLayout title="Home" description="XDoxs - Learn technology in depth with comprehensive documentation by Sheryians Coding School">
@@ -41,7 +40,7 @@ const categories = [...new Set(allDocs.map(doc => doc.data.category))];
           </p>
           <div class="hero-buttons">
             {allDocs.length > 0 ? (
-              <a href={`/docs/${allDocs[0].id}`} class="btn btn-primary">
+              <a href={`/docs/${(allDocs[0] as any).category}/${(allDocs[0] as any).slug}`} class="btn btn-primary">
                 Explore Documentation
               </a>
             ) : (
@@ -67,9 +66,10 @@ const categories = [...new Set(allDocs.map(doc => doc.data.category))];
         
         <div class="grid">
           {categories.map(category => {
-            const categoryDocs = allDocs.filter(doc => doc.data.category === category);
+            const categoryDocs = allDocs.filter((doc: any) => doc.category === category);
+            const firstDoc = categoryDocs[0] as any;
             return (
-              <a href={`/docs/${categoryDocs[0].id}`} class="card">
+              <a href={`/docs/${firstDoc.category}/${firstDoc.slug}`} class="card">
                 <h3>{category}</h3>
                 <p>{categoryDocs.length} {categoryDocs.length === 1 ? 'guide' : 'guides'}</p>
                 <span class="card-link">Explore →</span>

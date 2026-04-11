@@ -541,7 +541,10 @@ const draftOptions = existingDrafts.filter(d => d.status === 'draft' || d.status
       const f = e.dataTransfer?.files?.[0];
       if (f) handleFile(f);
     });
-    uploadArea.addEventListener('click', () => fileInput.click());
+    uploadArea.addEventListener('click', (e) => {
+      if (e.target.closest('.browse-btn')) return; // button handles its own click
+      fileInput.click();
+    });
     fileInput.addEventListener('change', e => {
       const f = e.target.files?.[0];
       if (f) handleFile(f);
@@ -650,7 +653,10 @@ const draftOptions = existingDrafts.filter(d => d.status === 'draft' || d.status
     const topicFileInput = document.getElementById('topic-file-input');
 
     document.getElementById('browse-topic-file').addEventListener('click', () => topicFileInput.click());
-    topicUploadArea.addEventListener('click', () => topicFileInput.click());
+    topicUploadArea.addEventListener('click', (e) => {
+      if (e.target.closest('.browse-btn-small')) return;
+      topicFileInput.click();
+    });
     topicUploadArea.addEventListener('dragover', e => e.preventDefault());
     topicUploadArea.addEventListener('drop', e => {
       e.preventDefault();

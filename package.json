@@ -10,7 +10,8 @@
     "build": "astro build",
     "preview": "astro preview",
     "astro": "astro",
-    "seed": "tsx scripts/seed-users.ts"
+    "seed": "tsx scripts/seed-users.ts",
+    "reset:docs": "tsx scripts/reset-docs.ts"
   },
   "dependencies": {
     "@astrojs/mdx": "^5.0.3",
@@ -27,6 +28,7 @@
     "mongoose": "^9.4.1"
   },
   "devDependencies": {
-    "@types/marked": "^5.0.2"
+    "@types/marked": "^5.0.2",
+    "tsx": "^4.21.0"
   }
 }

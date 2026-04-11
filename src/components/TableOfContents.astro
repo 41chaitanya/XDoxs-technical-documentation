@@ -171,7 +171,7 @@ const tocHeadings = headings.filter(h => h.depth <= 3);
     const headings = document.querySelectorAll('.doc-content h2, .doc-content h3');
     const tocItems = document.querySelectorAll('.toc-item');
     
-    let currentActive = null;
+    let currentActive: string | null = null;
     
     headings.forEach((heading) => {
       const rect = heading.getBoundingClientRect();
@@ -202,7 +202,7 @@ const tocHeadings = headings.filter(h => h.depth <= 3);
       });
       
       // Add active to clicked item
-      const tocItem = e.currentTarget.closest('.toc-item');
+      const tocItem = (e.currentTarget as HTMLElement).closest('.toc-item');
       if (tocItem) {
         tocItem.classList.add('active');
       }

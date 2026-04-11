@@ -1,18 +1,20 @@
 ---
-import { getCollection } from 'astro:content';
+import { getDb } from '../lib/db/mongodb';
+import { COLLECTIONS } from '../lib/db/models';
 import { verifyToken } from '../lib/auth/jwt';
 
-const allDocs = await getCollection('docs');
+const db = await getDb();
+const allDocs = await db.collection(COLLECTIONS.DOC_DRAFTS)
+  .find({ status: 'approved' })
+  .project({ title: 1, category: 1, slug: 1 })
+  .toArray();
 
 // Group docs by category
-const docsByCategory = allDocs.reduce((acc, doc) => {
-  const category = doc.data.category;
-  if (!acc[category]) {
-    acc[category] = [];
-  }
-  acc[category].push(doc);
+const docsByCategory = allDocs.reduce((acc: Record<string, any[]>, doc: any) => {
+  if (!acc[doc.category]) acc[doc.category] = [];
+  acc[doc.category].push(doc);
   return acc;
-}, {} as Record<string, typeof allDocs>);
+}, {});
 
 const categories = Object.keys(docsByCategory).sort();
 
@@ -26,7 +28,9 @@ console.log('🍪 Token from cookie:', token ? 'Token exists' : 'No token');
 if (token) {
   try {
     user = verifyToken(token);
-    console.log('✅ User verified:', user.email, 'Role:', user.role);
+    if (user) {
+      console.log('✅ User verified:', user.email, 'Role:', user.role);
+    }
   } catch (error) {
     console.log('❌ Token verification failed:', error);
   }
@@ -64,9 +68,9 @@ console.log('📧 User email:', userEmail || 'N/A');
                 <div class="dropdown-section">
                   <div class="dropdown-category">{category}</div>
                   <div class="dropdown-items">
-                    {docsByCategory[category].map(doc => (
-                      <a href={`/docs/${doc.id}`} class="dropdown-item">
-                        {doc.data.title}
+                    {docsByCategory[category].map((doc: any) => (
+                      <a href={`/docs/${doc.category}/${doc.slug}`} class="dropdown-item">
+                        {doc.title}
                       </a>
                     ))}
                   </div>
@@ -125,7 +129,6 @@ console.log('📧 User email:', userEmail || 'N/A');
         </div>
         
         {isLoggedIn ? (
-          <!-- User Profile -->
           <div class="user-profile" style="display: block;">
             <button class="profile-btn" aria-label="User profile">
               <div class="profile-avatar">
@@ -173,7 +176,6 @@ console.log('📧 User email:', userEmail || 'N/A');
             </div>
           </div>
         ) : (
-          <!-- User Profile (hidden by default for static pages) -->
           <div class="user-profile" style="display: none;">
             <button class="profile-btn" aria-label="User profile">
               <div class="profile-avatar">U</div>
@@ -710,38 +712,34 @@ console.log('📧 User email:', userEmail || 'N/A');
         const data = await response.json();
         if (data.user) {
           // User is logged in - show profile, hide login
-          const loginBtn = document.querySelector('.login-btn');
-          const userProfile = document.querySelector('.user-profile');
+          const loginBtn = document.querySelector<HTMLElement>('.login-btn');
+          const userProfile = document.querySelector<HTMLElement>('.user-profile');
           
           if (loginBtn) loginBtn.style.display = 'none';
           if (userProfile) {
             userProfile.style.display = 'block';
-            // Update profile info
             const profileName = userProfile.querySelector('.profile-name');
             const profileRole = userProfile.querySelector('.profile-role');
             const profileAvatar = userProfile.querySelector('.profile-avatar');
-            const dashboardLink = userProfile.querySelector('.dashboard-link');
+            const dashboardLink = userProfile.querySelector<HTMLElement>('.dashboard-link');
             
             if (profileName) profileName.textContent = data.user.email;
             if (profileRole) profileRole.textContent = data.user.role.replace('_', ' ');
             if (profileAvatar) profileAvatar.textContent = data.user.email.charAt(0).toUpperCase();
             
-            // Show dashboard link for instructor/admin
             if (dashboardLink && (data.user.role === 'instructor' || data.user.role === 'super_admin')) {
               dashboardLink.style.display = 'flex';
             }
             
-            // Show admin link for super_admin
-            const adminLink = userProfile.querySelector('.admin-link');
+            const adminLink = userProfile.querySelector<HTMLElement>('.admin-link');
             if (adminLink && data.user.role === 'super_admin') {
               adminLink.style.display = 'flex';
             }
           }
         }
       } else {
-        // User not logged in - show login, hide profile
-        const loginBtn = document.querySelector('.login-btn');
-        const userProfile = document.querySelector('.user-profile');
+        const loginBtn = document.querySelector<HTMLElement>('.login-btn');
+        const userProfile = document.querySelector<HTMLElement>('.user-profile');
         
         if (loginBtn) loginBtn.style.display = 'block';
         if (userProfile) userProfile.style.display = 'none';
