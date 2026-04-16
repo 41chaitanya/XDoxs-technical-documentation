@@ -9,19 +9,14 @@ interface Props {
   author: string;
   category: string;
   tags: string[];
-  headings: Array<{
-    depth: number;
-    slug: string;
-    text: string;
-  }>;
+  headings: Array<{ depth: number; slug: string; text: string }>;
   docId: string;
-  topics?: Array<{
-    slug: string;
-    text: string;
-  }>;
+  topicsEn?: Array<{ slug: string; text: string }>;
+  topicsHi?: Array<{ slug: string; text: string }>;
+  hasHinglish?: boolean;
 }
 
-const { title, description, date, author, category, tags, headings, docId, topics = [] } = Astro.props;
+const { title, description, date, author, category, tags, headings, docId, topicsEn = [], topicsHi = [], hasHinglish = false } = Astro.props;
 
 const jsonLd = {
   '@context': 'https://schema.org',
@@ -47,13 +42,19 @@ const jsonLd = {
         <div class="doc-info">
           <h2 class="doc-title">{title}</h2>
           <span class="category-badge">{category}</span>
+          {hasHinglish && (
+            <div class="lang-toggle">
+              <button class="lang-btn active" id="btn-en" onclick="switchLanguage('en')">English</button>
+              <button class="lang-btn" id="btn-hi" onclick="switchLanguage('hi')">Hinglish</button>
+            </div>
+          )}
         </div>
         
-        {topics.length > 0 && (
+        {topicsEn.length > 0 && (
           <nav class="topics-nav">
             <h3 class="topics-heading">Topics</h3>
-            <ul class="topics-list">
-              {topics.map((topic, index) => (
+            <ul class="topics-list topics-list-en">
+              {topicsEn.map((topic, index) => (
                 <li>
                   <a href={`#${topic.slug}`} class="topic-link" data-slug={topic.slug}>
                     <span class="topic-number">{index + 1}</span>
@@ -62,6 +63,18 @@ const jsonLd = {
                 </li>
               ))}
             </ul>
+            {hasHinglish && topicsHi.length > 0 && (
+              <ul class="topics-list topics-list-hi" style="display:none">
+                {topicsHi.map((topic, index) => (
+                  <li>
+                    <a href={`#${topic.slug}`} class="topic-link" data-slug={topic.slug}>
+                      <span class="topic-number">{index + 1}</span>
+                      <span class="topic-title">{topic.text}</span>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            )}
           </nav>
         )}
       </div>
@@ -319,6 +332,179 @@ const jsonLd = {
 
   .doc-content :global(h3) {
     margin-top: 1.5rem;
+    scroll-margin-top: 80px;
+  }
+
+  /* For set:html rendered content */
+  .doc-content :global(h2[id]) {
+    scroll-margin-top: 80px;
+  }
+
+  /* Custom inline styles */
+  .doc-content :global(mark.doc-highlight) {
+    background: oklch(0.95 0.15 85);
+    color: oklch(0.3 0.1 85);
+    padding: 0.1rem 0.25rem;
+    border-radius: 3px;
+  }
+  .doc-content :global(u) { text-decoration: underline; }
+  /* Theme-aware accent color — changes automatically with theme */
+  .doc-content :global(.doc-color-accent) {
+    color: var(--primary);
+    font-weight: 500;
+  }
+
+  /* Language Toggle */
+  .lang-toggle {
+    display: flex;
+    gap: 0;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    width: fit-content;
+    margin-top: 0.75rem;
+  }
+
+  .lang-btn {
+    padding: 0.4rem 1.1rem;
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    border: none;
+    cursor: pointer;
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    transition: all 0.2s;
+  }
+
+  .lang-btn.active {
+    background: var(--primary);
+    color: white;
+  }
+
+  /* MCQ Blocks */
+  .doc-content :global(.mcq-block) {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.5rem;
+    margin: 1.5rem 0;
+  }
+
+  .doc-content :global(.mcq-question) {
+    font-weight: 600;
+    font-size: 1rem;
+    color: var(--text-primary);
+    margin-bottom: 1rem;
+  }
+
+  .doc-content :global(.mcq-options) {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+  }
+
+  .doc-content :global(.mcq-option) {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.65rem 1rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: var(--bg-primary);
+  }
+
+  .doc-content :global(.mcq-option:hover) {
+    border-color: var(--primary);
+    background: var(--primary-light);
+  }
+
+  .doc-content :global(.mcq-option.selected) {
+    border-color: var(--primary);
+    background: var(--primary-light);
+  }
+
+  .doc-content :global(.mcq-option.correct) {
+    border-color: oklch(0.6 0.15 140);
+    background: oklch(0.95 0.05 140);
+  }
+
+  .doc-content :global(.mcq-option.wrong) {
+    border-color: oklch(0.6 0.2 27);
+    background: oklch(0.95 0.05 27);
+  }
+
+  .doc-content :global(.mcq-letter) {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    background: var(--bg-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.8rem;
+    flex-shrink: 0;
+    color: var(--text-secondary);
+  }
+
+  .doc-content :global(.mcq-option.correct .mcq-letter) {
+    background: oklch(0.6 0.15 140);
+    color: white;
+  }
+
+  .doc-content :global(.mcq-option.wrong .mcq-letter) {
+    background: oklch(0.6 0.2 27);
+    color: white;
+  }
+
+  .doc-content :global(.mcq-text) {
+    font-size: 0.9rem;
+    color: var(--text-primary);
+  }
+
+  .doc-content :global(.mcq-submit) {
+    padding: 0.6rem 1.5rem;
+    background: var(--primary);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+  }
+
+  .doc-content :global(.mcq-submit:hover) {
+    background: var(--primary-hover);
+  }
+
+  .doc-content :global(.mcq-submit:disabled) {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .doc-content :global(.mcq-result) {
+    margin-top: 1rem;
+  }
+
+  .doc-content :global(.mcq-feedback) {
+    font-weight: 600;
+    font-size: 0.95rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .doc-content :global(.mcq-explanation) {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    padding: 0.75rem 1rem;
+    background: var(--bg-primary);
+    border-left: 3px solid var(--primary);
+    border-radius: 4px;
+    line-height: 1.6;
   }
 
   @media (max-width: 1200px) {
@@ -345,45 +531,135 @@ const jsonLd = {
 </style>
 
 <script>
-  // Smooth scroll and active state for topic links
   document.addEventListener('DOMContentLoaded', () => {
-    const topicLinks = document.querySelectorAll('.topic-link');
-    
+    const topicLinks = document.querySelectorAll<HTMLAnchorElement>('.topic-link');
+
     // Smooth scroll on click
     topicLinks.forEach(link => {
       link.addEventListener('click', (e) => {
         e.preventDefault();
         const slug = link.getAttribute('data-slug');
+        if (!slug) return;
         const target = document.getElementById(slug);
         if (target) {
           target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          // Update URL without jumping
           history.pushState(null, '', `#${slug}`);
+          // Immediately set active
+          topicLinks.forEach(l => l.classList.remove('active'));
+          link.classList.add('active');
         }
       });
     });
-    
-    // Highlight active topic on scroll
+
+    // Highlight active topic on scroll using IntersectionObserver
+    const headings = document.querySelectorAll<HTMLElement>('.doc-content h2[id]');
+
+    if (headings.length === 0) return;
+
+    // Set first topic active by default
+    topicLinks[0]?.classList.add('active');
+
     const observer = new IntersectionObserver((entries) => {
       entries.forEach(entry => {
         if (entry.isIntersecting) {
           const id = entry.target.id;
           topicLinks.forEach(link => {
-            if (link.getAttribute('data-slug') === id) {
-              link.classList.add('active');
-            } else {
-              link.classList.remove('active');
-            }
+            const isMatch = link.getAttribute('data-slug') === id;
+            link.classList.toggle('active', isMatch);
           });
         }
       });
     }, {
-      rootMargin: '-80px 0px -80% 0px'
+      rootMargin: '-80px 0px -70% 0px',
+      threshold: 0
     });
-    
-    // Observe all H2 headings
-    document.querySelectorAll('.doc-content h2[id]').forEach(heading => {
-      observer.observe(heading);
+
+    headings.forEach(h => observer.observe(h));
+  });
+</script>
+
+<script>
+  // Language toggle
+  (window as any).switchLanguage = function(lang: string) {
+    const en = document.querySelector<HTMLElement>('.doc-content-en');
+    const hi = document.querySelector<HTMLElement>('.doc-content-hi');
+    const btnEn = document.getElementById('btn-en');
+    const btnHi = document.getElementById('btn-hi');
+    const topicsEn = document.querySelector<HTMLElement>('.topics-list-en');
+    const topicsHi = document.querySelector<HTMLElement>('.topics-list-hi');
+
+    if (lang === 'hi') {
+      if (en) en.style.display = 'none';
+      if (hi) hi.style.display = 'block';
+      if (topicsEn) topicsEn.style.display = 'none';
+      if (topicsHi) topicsHi.style.display = 'block';
+      btnEn?.classList.remove('active');
+      btnHi?.classList.add('active');
+    } else {
+      if (en) en.style.display = 'block';
+      if (hi) hi.style.display = 'none';
+      if (topicsEn) topicsEn.style.display = 'block';
+      if (topicsHi) topicsHi.style.display = 'none';
+      btnEn?.classList.add('active');
+      btnHi?.classList.remove('active');
+    }
+  };
+</script>
+
+<script>
+  (window as any).checkMcq = function(id: string) {
+    const block = document.getElementById(id);
+    if (!block) return;
+
+    const selected = block.querySelector<HTMLInputElement>('input[type="radio"]:checked');
+    if (!selected) {
+      // No option selected — shake the block
+      block.style.outline = '2px solid oklch(0.6 0.2 27)';
+      setTimeout(() => block.style.outline = '', 1000);
+      return;
+    }
+
+    const correctAnswer = block.getAttribute('data-answer');
+    const selectedValue = selected.value;
+    const options = block.querySelectorAll<HTMLElement>('.mcq-option');
+    const result = block.querySelector<HTMLElement>('.mcq-result');
+    const feedback = block.querySelector<HTMLElement>('.mcq-feedback');
+    const submitBtn = block.querySelector<HTMLButtonElement>('.mcq-submit');
+
+    // Disable further interaction
+    block.querySelectorAll<HTMLInputElement>('input[type="radio"]').forEach(r => r.disabled = true);
+    if (submitBtn) submitBtn.disabled = true;
+
+    // Highlight options
+    options.forEach(option => {
+      const letter = option.getAttribute('data-letter');
+      if (letter === correctAnswer) {
+        option.classList.add('correct');
+      } else if (letter === selectedValue) {
+        option.classList.add('wrong');
+      }
+    });
+
+    // Show result
+    if (result) result.style.display = 'block';
+    if (feedback) {
+      if (selectedValue === correctAnswer) {
+        feedback.textContent = 'Correct!';
+        feedback.style.color = 'oklch(0.5 0.15 140)';
+      } else {
+        feedback.textContent = `Wrong! Correct answer is ${correctAnswer}`;
+        feedback.style.color = 'oklch(0.5 0.2 27)';
+      }
+    }
+  };
+
+  // Highlight selected option on click
+  document.querySelectorAll<HTMLElement>('.mcq-option').forEach(option => {
+    option.addEventListener('click', () => {
+      const block = option.closest('.mcq-block');
+      if (!block) return;
+      block.querySelectorAll('.mcq-option').forEach(o => o.classList.remove('selected'));
+      option.classList.add('selected');
     });
   });
 </script>

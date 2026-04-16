@@ -3,10 +3,28 @@ import { getDb } from '../../lib/db/mongodb';
 import { COLLECTIONS } from '../../lib/db/models';
 import { renderMarkdown } from '../../lib/markdown/render';
 import { splitMarkdownIntoTopics, extractHeadingsFromTopic } from '../../lib/markdown/splitter';
+import { extractLangBlocks } from '../../lib/markdown/lang';
 import DocLayout from '../../layouts/DocLayout.astro';
 
-export const prerender = false;
+// ✅ STATIC GENERATION: Build time pe MongoDB se fetch, runtime pe NO DB calls
+export const prerender = true;
 
+// Build time: Fetch all approved docs and generate static paths
+export async function getStaticPaths() {
+  const db = await getDb();
+  const approvedDocs = await db.collection(COLLECTIONS.DOC_DRAFTS)
+    .find({ status: 'approved' })
+    .toArray();
+
+  return approvedDocs.map((draft) => ({
+    params: { 
+      slug: `${draft.category}/${draft.slug}` 
+    },
+    props: { draft }
+  }));
+}
+
+const { draft } = Astro.props;
 const { slug } = Astro.params;
 const slugPath = Array.isArray(slug) ? slug.join('/') : (slug ?? '');
 
@@ -14,24 +32,25 @@ const parts = slugPath.split('/');
 const category = parts[0];
 const docSlug = parts[1];
 
-if (!category || !docSlug) return Astro.redirect('/');
+if (!category || !docSlug || !draft) return Astro.redirect('/');
 
-const db = await getDb();
-const draft = await db.collection(COLLECTIONS.DOC_DRAFTS).findOne({
-  category,
-  slug: docSlug,
-  status: 'approved',
-});
+const { en: enContent, hi: hiContent } = extractLangBlocks(String(draft.content || ''));
 
-if (!draft) return Astro.redirect('/');
+const htmlContent = String(draft.renderedHtml || '') || await renderMarkdown(enContent);
+const htmlContentHi = String(draft.renderedHtmlHi || '');
+const hasHinglish = !!htmlContentHi;
 
-// Use pre-rendered HTML if available (fast path), otherwise render on-the-fly (fallback)
-const htmlContent = draft.renderedHtml ?? await renderMarkdown(draft.content);
+// Extract headings for sidebar/TOC - for both languages
+const topicsEn = splitMarkdownIntoTopics(enContent);
+const headingsEn = topicsEn.flatMap(t => extractHeadingsFromTopic(t.content));
+const h2TopicsEn = headingsEn.filter(h => h.depth === 2);
 
-// Extract headings for sidebar/TOC
-const topics = splitMarkdownIntoTopics(draft.content);
-const headings = topics.flatMap(t => extractHeadingsFromTopic(t.content));
-const h2Topics = headings.filter(h => h.depth === 2);
+let h2TopicsHi: Array<{ slug: string; text: string }> = [];
+if (hasHinglish && hiContent) {
+  const topicsHi = splitMarkdownIntoTopics(hiContent);
+  const headingsHi = topicsHi.flatMap(t => extractHeadingsFromTopic(t.content));
+  h2TopicsHi = headingsHi.filter(h => h.depth === 2);
+}
 
 const publishedAt = draft.publishedAt ? new Date(draft.publishedAt) : new Date(draft.updatedAt);
 ---
@@ -43,9 +62,12 @@ const publishedAt = draft.publishedAt ? new Date(draft.publishedAt) : new Date(d
   author={draft.instructorEmail}
   category={draft.category}
   tags={draft.tags || []}
-  headings={headings}
+  headings={headingsEn}
   docId={slugPath}
-  topics={h2Topics}
+  topicsEn={h2TopicsEn}
+  topicsHi={h2TopicsHi}
+  hasHinglish={hasHinglish}
 >
-  <div set:html={htmlContent} />
+  <div class="doc-content-en" set:html={htmlContent} />
+  {hasHinglish && <div class="doc-content-hi" set:html={htmlContentHi} style="display:none" />}
 </DocLayout>

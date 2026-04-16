@@ -3,6 +3,8 @@ import BaseLayout from '../../../layouts/BaseLayout.astro';
 import Header from '../../../components/Header.astro';
 import { verifyToken } from '../../../lib/auth/jwt';
 import { getInstructorDrafts } from '../../../lib/db/docs';
+import { getDb } from '../../../lib/db/mongodb';
+import { COLLECTIONS } from '../../../lib/db/models';
 
 export const prerender = false;
 
@@ -17,6 +19,14 @@ if (!payload || (payload.role !== 'instructor' && payload.role !== 'super_admin'
 // Fetch existing drafts for the "append to existing" dropdown
 const existingDrafts = await getInstructorDrafts(payload.userId);
 const draftOptions = existingDrafts.filter(d => d.status === 'draft' || d.status === 'rejected');
+
+// Fetch all unique categories from existing docs
+const db = await getDb();
+const existingCategories = await db.collection(COLLECTIONS.DOC_DRAFTS)
+  .distinct('category');
+
+const defaultCategories = ['javascript', 'python', 'html', 'devops', 'react', 'nodejs'];
+const allCategories = [...new Set([...defaultCategories, ...existingCategories])].sort();
 ---
 
 <BaseLayout title="Upload Documentation - XDoxs">
@@ -29,6 +39,7 @@ const draftOptions = existingDrafts.filter(d => d.status === 'draft' || d.status
       <div class="mode-tabs">
         <button class="mode-tab active" id="tab-file" onclick="switchMode('file')">Upload .md File</button>
         <button class="mode-tab" id="tab-topic" onclick="switchMode('topic')">Add Single Topic</button>
+        <button class="mode-tab" id="tab-ai" onclick="window.location.href='/instructor/docs/ai-generate'">Generate using AI</button>
       </div>
 
       <!-- MODE 1: Upload full MD file -->
@@ -51,13 +62,13 @@ const draftOptions = existingDrafts.filter(d => d.status === 'draft' || d.status
               <label>Category *</label>
               <select id="category">
                 <option value="">Select category</option>
-                <option value="javascript">JavaScript</option>
-                <option value="python">Python</option>
-                <option value="html">HTML / CSS</option>
-                <option value="devops">DevOps</option>
-                <option value="react">React</option>
-                <option value="nodejs">Node.js</option>
+                {allCategories.map(cat => (
+                  <option value={cat}>{cat.charAt(0).toUpperCase() + cat.slice(1)}</option>
+                ))}
+                <option value="__custom__">+ Add custom category</option>
               </select>
+              <input type="text" id="category-custom" placeholder="Enter custom category" style="display:none; margin-top: 0.5rem;" />
+            </div>
             </div>
             <div class="form-group">
               <label>Title *</label>
@@ -112,13 +123,12 @@ const draftOptions = existingDrafts.filter(d => d.status === 'draft' || d.status
                 <label>Category *</label>
                 <select id="new-category">
                   <option value="">Select category</option>
-                  <option value="javascript">JavaScript</option>
-                  <option value="python">Python</option>
-                  <option value="html">HTML / CSS</option>
-                  <option value="devops">DevOps</option>
-                  <option value="react">React</option>
-                  <option value="nodejs">Node.js</option>
+                  {allCategories.map(cat => (
+                    <option value={cat}>{cat.charAt(0).toUpperCase() + cat.slice(1)}</option>
+                  ))}
+                  <option value="__custom__">+ Add custom category</option>
                 </select>
+                <input type="text" id="new-category-custom" placeholder="Enter custom category" style="display:none; margin-top: 0.5rem;" />
               </div>
               <div class="form-group">
                 <label>Doc Title *</label>
@@ -521,6 +531,33 @@ const draftOptions = existingDrafts.filter(d => d.status === 'draft' || d.status
   <script define:vars={{ draftOptions: draftOptions.map(d => ({ _id: String(d._id), title: d.title })) }}>
     let markdownContent = '';
 
+    // --- Custom category toggle ---
+    function setupCustomCategory(selectId, inputId) {
+      const select = document.getElementById(selectId);
+      const input = document.getElementById(inputId);
+      select.addEventListener('change', () => {
+        if (select.value === '__custom__') {
+          input.style.display = 'block';
+          input.focus();
+        } else {
+          input.style.display = 'none';
+          input.value = '';
+        }
+      });
+    }
+
+    function getCategory(selectId, inputId) {
+      const select = document.getElementById(selectId);
+      const input = document.getElementById(inputId);
+      if (select.value === '__custom__') {
+        return input.value.trim().toLowerCase().replace(/\s+/g, '-');
+      }
+      return select.value;
+    }
+
+    setupCustomCategory('category', 'category-custom');
+    setupCustomCategory('new-category', 'new-category-custom');
+
     // --- Mode switching ---
     window.switchMode = function(mode) {
       document.getElementById('mode-file').style.display = mode === 'file' ? 'block' : 'none';
@@ -552,7 +589,7 @@ const draftOptions = existingDrafts.filter(d => d.status === 'draft' || d.status
 
     function handleFile(file) {
       if (!file.name.match(/\.(md|markdown)$/i)) {
-        alert('Please upload a .md or .markdown file');
+        Dialog.alert('Please upload a .md or .markdown file', 'warn');
         return;
       }
       const reader = new FileReader();
@@ -590,13 +627,13 @@ const draftOptions = existingDrafts.filter(d => d.status === 'draft' || d.status
     }
 
     document.getElementById('submit-btn').addEventListener('click', async () => {
-      const category = document.getElementById('category').value;
+      const category = getCategory('category', 'category-custom');
       const title = document.getElementById('title').value.trim();
       const description = document.getElementById('description').value.trim();
       const tags = document.getElementById('tags').value.split(',').map(t => t.trim()).filter(Boolean);
 
       if (!category || !title || !markdownContent) {
-        alert('Category and title are required');
+        await Dialog.alert('Category and title are required', 'warn');
         return;
       }
 
@@ -616,7 +653,7 @@ const draftOptions = existingDrafts.filter(d => d.status === 'draft' || d.status
       if (data.success) {
         window.location.href = `/instructor/docs/edit/${data.draft._id}`;
       } else {
-        alert('Error: ' + data.error);
+        await Dialog.alert('Error: ' + data.error, 'error');
         btn.disabled = false;
         btn.textContent = 'Open in Editor';
       }
@@ -670,7 +707,7 @@ const draftOptions = existingDrafts.filter(d => d.status === 'draft' || d.status
 
     function handleTopicFile(file) {
       if (!file.name.match(/\.(md|markdown)$/i)) {
-        alert('Please upload a .md or .markdown file');
+        Dialog.alert('Please upload a .md or .markdown file', 'warn');
         return;
       }
       const reader = new FileReader();
@@ -706,7 +743,7 @@ const draftOptions = existingDrafts.filter(d => d.status === 'draft' || d.status
       const isUploadMode = document.getElementById('upload-mode').style.display !== 'none';
       const topicContent = isUploadMode ? topicFileContent : document.getElementById('topic-content').value.trim();
 
-      if (!topicTitle) { alert('Topic title is required'); return; }
+      if (!topicTitle) { await Dialog.alert('Topic title is required', 'warn'); return; }
 
       const btn = document.getElementById('add-topic-btn');
       btn.disabled = true;
@@ -716,9 +753,9 @@ const draftOptions = existingDrafts.filter(d => d.status === 'draft' || d.status
 
       // Create new doc first if needed
       if (target === 'new') {
-        const newCat = document.getElementById('new-category').value;
+        const newCat = getCategory('new-category', 'new-category-custom');
         const newTitle = document.getElementById('new-doc-title').value.trim();
-        if (!newCat || !newTitle) { alert('Category and doc title are required for a new doc'); btn.disabled = false; btn.textContent = 'Add Topic & Open Editor'; return; }
+        if (!newCat || !newTitle) { await Dialog.alert('Category and doc title are required for a new doc', 'warn'); btn.disabled = false; btn.textContent = 'Add Topic & Open Editor'; return; }
 
         const slug = newTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
         const res = await fetch('/api/docs/create', {
@@ -727,7 +764,7 @@ const draftOptions = existingDrafts.filter(d => d.status === 'draft' || d.status
           body: JSON.stringify({ category: newCat, title: newTitle, slug, description: '', content: '', tags: [] }),
         });
         const data = await res.json();
-        if (!data.success) { alert('Error creating doc: ' + data.error); btn.disabled = false; btn.textContent = 'Add Topic & Open Editor'; return; }
+        if (!data.success) { await Dialog.alert('Error creating doc: ' + data.error, 'error'); btn.disabled = false; btn.textContent = 'Add Topic & Open Editor'; return; }
         draftId = data.draft._id;
       }
 
@@ -743,7 +780,7 @@ const draftOptions = existingDrafts.filter(d => d.status === 'draft' || d.status
       if (data.success) {
         window.location.href = `/instructor/docs/edit/${draftId}`;
       } else {
-        alert('Error: ' + data.error);
+        await Dialog.alert('Error: ' + data.error, 'error');
         btn.disabled = false;
         btn.textContent = 'Add Topic & Open Editor';
       }

@@ -340,7 +340,7 @@ const userEmail = payload.email;
     loadDocs();
 
     async function removeFromPublic(draftId: string, btn: HTMLButtonElement) {
-      if (!confirm('Remove this doc from public view? The .md file will be deleted and status reset to draft.')) return;
+      if (!await Dialog.confirm('Remove this doc from public view? The .md file will be deleted and status reset to draft.', 'warn', 'Remove', true)) return;
       btn.disabled = true;
       btn.textContent = 'Removing...';
       try {
@@ -353,12 +353,12 @@ const userEmail = payload.email;
         if (data.success) {
           loadDocs();
         } else {
-          alert('Error: ' + data.error);
+          await Dialog.alert('Error: ' + data.error, 'error');
           btn.disabled = false;
           btn.textContent = 'Remove from Public';
         }
       } catch {
-        alert('Error removing doc');
+        await Dialog.alert('Error removing doc', 'error');
         btn.disabled = false;
         btn.textContent = 'Remove from Public';
       }

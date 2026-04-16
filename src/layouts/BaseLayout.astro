@@ -34,6 +34,9 @@ const canonicalURL = new URL(Astro.url.pathname, Astro.site);
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
     
+    <!-- Custom Dialog utility (replaces alert/confirm) -->
+    <script is:inline src="/dialog.js"></script>
+
     <!-- Global Theme Script - Runs immediately to prevent flash -->
     <script is:inline>
       (function() {

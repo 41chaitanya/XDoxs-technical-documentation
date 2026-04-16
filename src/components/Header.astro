@@ -1,50 +1,5 @@
 ---
-import { getDb } from '../lib/db/mongodb';
-import { COLLECTIONS } from '../lib/db/models';
-import { verifyToken } from '../lib/auth/jwt';
-
-const db = await getDb();
-const allDocs = await db.collection(COLLECTIONS.DOC_DRAFTS)
-  .find({ status: 'approved' })
-  .project({ title: 1, category: 1, slug: 1 })
-  .toArray();
-
-// Group docs by category
-const docsByCategory = allDocs.reduce((acc: Record<string, any[]>, doc: any) => {
-  if (!acc[doc.category]) acc[doc.category] = [];
-  acc[doc.category].push(doc);
-  return acc;
-}, {});
-
-const categories = Object.keys(docsByCategory).sort();
-
-// Check if user is logged in
-const token = Astro.cookies.get('auth_token')?.value;
-let user: { userId: string; email: string; role: string } | null = null;
-
-console.log('🎨 Header rendering on server');
-console.log('🍪 Token from cookie:', token ? 'Token exists' : 'No token');
-
-if (token) {
-  try {
-    user = verifyToken(token);
-    if (user) {
-      console.log('✅ User verified:', user.email, 'Role:', user.role);
-    }
-  } catch (error) {
-    console.log('❌ Token verification failed:', error);
-  }
-} else {
-  console.log('⚠️ No auth token found in cookies');
-}
-
-const isLoggedIn = !!user;
-const userEmail = user?.email || '';
-const userRole = user?.role || '';
-const isInstructorOrAdmin = user?.role === 'instructor' || user?.role === 'super_admin';
-
-console.log('👤 Is logged in:', isLoggedIn);
-console.log('📧 User email:', userEmail || 'N/A');
+// ✅ NO SERVER-SIDE DATA FETCHING - All data loaded client-side for static pages
 ---
 
 <header class="header">
@@ -63,19 +18,8 @@ console.log('📧 User email:', userEmail || 'N/A');
           </a>
           
           <div class="dropdown-menu">
-            <div class="dropdown-content">
-              {categories.map(category => (
-                <div class="dropdown-section">
-                  <div class="dropdown-category">{category}</div>
-                  <div class="dropdown-items">
-                    {docsByCategory[category].map((doc: any) => (
-                      <a href={`/docs/${doc.category}/${doc.slug}`} class="dropdown-item">
-                        {doc.title}
-                      </a>
-                    ))}
-                  </div>
-                </div>
-              ))}
+            <div class="dropdown-content" id="docs-nav-content">
+              <div class="dropdown-loading">Loading...</div>
             </div>
           </div>
         </div>
@@ -128,97 +72,48 @@ console.log('📧 User email:', userEmail || 'N/A');
           </div>
         </div>
         
-        {isLoggedIn ? (
-          <div class="user-profile" style="display: block;">
-            <button class="profile-btn" aria-label="User profile">
-              <div class="profile-avatar">
-                {userEmail.charAt(0).toUpperCase()}
-              </div>
-            </button>
-            
-            <div class="profile-dropdown">
-              <div class="profile-info">
-                <div class="profile-name">{userEmail}</div>
-                <div class="profile-role">{userRole.replace('_', ' ')}</div>
-              </div>
-              <div class="profile-divider"></div>
-              <div class="profile-links">
-                {isInstructorOrAdmin && (
-                  <a href="/instructor/dashboard" class="profile-link">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <rect x="3" y="3" width="7" height="7"></rect>
-                      <rect x="14" y="3" width="7" height="7"></rect>
-                      <rect x="14" y="14" width="7" height="7"></rect>
-                      <rect x="3" y="14" width="7" height="7"></rect>
-                    </svg>
-                    Instructor Dashboard
-                  </a>
-                )}
-                {user?.role === 'super_admin' && (
-                  <a href="/admin/dashboard" class="profile-link">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
-                      <path d="M2 17l10 5 10-5"></path>
-                      <path d="M2 12l10 5 10-5"></path>
-                    </svg>
-                    Admin Dashboard
-                  </a>
-                )}
-                <button class="profile-link logout-btn" id="logout-btn">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-                    <polyline points="16 17 21 12 16 7"></polyline>
-                    <line x1="21" y1="12" x2="9" y2="12"></line>
-                  </svg>
-                  Logout
-                </button>
-              </div>
+        <div class="user-profile" style="display: none;">
+          <button class="profile-btn" aria-label="User profile">
+            <div class="profile-avatar">U</div>
+          </button>
+          
+          <div class="profile-dropdown">
+            <div class="profile-info">
+              <div class="profile-name"></div>
+              <div class="profile-role"></div>
+            </div>
+            <div class="profile-divider"></div>
+            <div class="profile-links">
+              <a href="/instructor/dashboard" class="profile-link dashboard-link" style="display: none;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="3" width="7" height="7"></rect>
+                  <rect x="14" y="3" width="7" height="7"></rect>
+                  <rect x="14" y="14" width="7" height="7"></rect>
+                  <rect x="3" y="14" width="7" height="7"></rect>
+                </svg>
+                Instructor Dashboard
+              </a>
+              <a href="/admin/dashboard" class="profile-link admin-link" style="display: none;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                  <path d="M2 17l10 5 10-5"></path>
+                  <path d="M2 12l10 5 10-5"></path>
+                </svg>
+                Admin Dashboard
+              </a>
+              <button class="profile-link logout-btn" id="logout-btn">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                  <polyline points="16 17 21 12 16 7"></polyline>
+                  <line x1="21" y1="12" x2="9" y2="12"></line>
+                </svg>
+                Logout
+              </button>
             </div>
           </div>
-        ) : (
-          <div class="user-profile" style="display: none;">
-            <button class="profile-btn" aria-label="User profile">
-              <div class="profile-avatar">U</div>
-            </button>
-            
-            <div class="profile-dropdown">
-              <div class="profile-info">
-                <div class="profile-name"></div>
-                <div class="profile-role"></div>
-              </div>
-              <div class="profile-divider"></div>
-              <div class="profile-links">
-                <a href="/instructor/dashboard" class="profile-link dashboard-link" style="display: none;">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <rect x="3" y="3" width="7" height="7"></rect>
-                    <rect x="14" y="3" width="7" height="7"></rect>
-                    <rect x="14" y="14" width="7" height="7"></rect>
-                    <rect x="3" y="14" width="7" height="7"></rect>
-                  </svg>
-                  Instructor Dashboard
-                </a>
-                <a href="/admin/dashboard" class="profile-link admin-link" style="display: none;">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
-                    <path d="M2 17l10 5 10-5"></path>
-                    <path d="M2 12l10 5 10-5"></path>
-                  </svg>
-                  Admin Dashboard
-                </a>
-                <button class="profile-link logout-btn" id="logout-btn">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-                    <polyline points="16 17 21 12 16 7"></polyline>
-                    <line x1="21" y1="12" x2="9" y2="12"></line>
-                  </svg>
-                  Logout
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        </div>
         
-        <a href="/login" class="login-btn" style={isLoggedIn ? 'display: none;' : 'display: block;'}>Login</a>
+        <a href="/login" class="login-btn" style="display: block;">Login</a>
       </div>
     </nav>
   </div>
@@ -384,6 +279,13 @@ console.log('📧 User email:', userEmail || 'N/A');
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
     gap: 1.5rem;
+  }
+
+  .dropdown-loading {
+    padding: 2rem;
+    text-align: center;
+    color: var(--text-secondary);
+    grid-column: 1 / -1;
   }
 
   .dropdown-section {
@@ -684,24 +586,67 @@ console.log('📧 User email:', userEmail || 'N/A');
     root.style.setProperty('--primary-dark', `oklch(0.4 0.15 ${hue})`);
   }
 
+  // Load docs navigation
+  async function loadDocsNav() {
+    try {
+      console.log('🔍 Loading docs navigation...');
+      const response = await fetch('/api/docs/nav');
+      console.log('📡 Response status:', response.status);
+      
+      const data = await response.json();
+      console.log('📦 Data received:', data);
+      
+      if (data.success) {
+        const navContent = document.getElementById('docs-nav-content');
+        if (navContent) {
+          const html = data.categories.map((category: string) => {
+            const docs = data.docsByCategory[category];
+            return `
+              <div class="dropdown-section">
+                <div class="dropdown-category">${category}</div>
+                <div class="dropdown-items">
+                  ${docs.map((doc: any) => `
+                    <a href="/docs/${doc.category}/${doc.slug}" class="dropdown-item">
+                      ${doc.title}
+                    </a>
+                  `).join('')}
+                </div>
+              </div>
+            `;
+          }).join('');
+          
+          console.log('✅ Navigation HTML generated, updating DOM');
+          navContent.innerHTML = html;
+        } else {
+          console.error('❌ docs-nav-content element not found');
+        }
+      } else {
+        console.error('❌ API returned error:', data.error);
+      }
+    } catch (error) {
+      console.error('❌ Error loading docs nav:', error);
+      const navContent = document.getElementById('docs-nav-content');
+      if (navContent) {
+        navContent.innerHTML = '<div class="dropdown-loading">Failed to load</div>';
+      }
+    }
+  }
+
   // Logout functionality
   const logoutBtn = document.getElementById('logout-btn');
   if (logoutBtn) {
     logoutBtn.addEventListener('click', async () => {
-      console.log('🚪 Logout clicked');
       try {
         await fetch('/api/auth/logout', { method: 'POST' });
-        console.log('✅ Logout successful, redirecting...');
         window.location.href = '/';
       } catch (error) {
-        console.error('❌ Logout error:', error);
+        console.error('Logout error:', error);
         window.location.href = '/';
       }
     });
   }
   
   // Client-side auth check for static pages
-  // This runs on every page to sync login state
   async function checkAuthState() {
     try {
       const response = await fetch('/api/auth/me', {
@@ -711,7 +656,6 @@ console.log('📧 User email:', userEmail || 'N/A');
       if (response.ok) {
         const data = await response.json();
         if (data.user) {
-          // User is logged in - show profile, hide login
           const loginBtn = document.querySelector<HTMLElement>('.login-btn');
           const userProfile = document.querySelector<HTMLElement>('.user-profile');
           
@@ -737,24 +681,13 @@ console.log('📧 User email:', userEmail || 'N/A');
             }
           }
         }
-      } else {
-        const loginBtn = document.querySelector<HTMLElement>('.login-btn');
-        const userProfile = document.querySelector<HTMLElement>('.user-profile');
-        
-        if (loginBtn) loginBtn.style.display = 'block';
-        if (userProfile) userProfile.style.display = 'none';
       }
     } catch (error) {
       console.error('Auth check error:', error);
     }
   }
   
-  // Run auth check on page load
+  // Initialize on page load
+  loadDocsNav();
   checkAuthState();
-  
-  // Debug: Log header state
-  console.log('🎨 Header loaded');
-  console.log('🍪 Cookies:', document.cookie);
-  console.log('👤 Profile button exists:', !!document.querySelector('.profile-btn'));
-  console.log('🔐 Login button exists:', !!document.querySelector('.login-btn'));
 </script>

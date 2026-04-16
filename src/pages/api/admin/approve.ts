@@ -48,8 +48,28 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       status: 'approved',
       publishedAt: new Date(),
     });
+
+    // 🚀 Trigger rebuild on Vercel (if deploy hook is configured)
+    const deployHook = import.meta.env.VERCEL_DEPLOY_HOOK;
+    if (deployHook) {
+      try {
+        await fetch(deployHook, { method: 'POST' });
+        console.log('✅ Rebuild triggered on Vercel');
+      } catch (error) {
+        console.error('❌ Failed to trigger rebuild:', error);
+        // Don't fail the approval if rebuild fails
+      }
+    } else {
+      console.log('⚠️ No deploy hook configured - manual rebuild required');
+    }
     
-    return new Response(JSON.stringify({ success: true }), {
+    return new Response(
+      JSON.stringify({ 
+        success: true,
+        message: deployHook 
+          ? 'Document approved and rebuild triggered' 
+          : 'Document approved - manual rebuild required'
+      }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
     });

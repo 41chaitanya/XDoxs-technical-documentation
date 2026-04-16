@@ -4,18 +4,10 @@ import Header from '../components/Header.astro';
 import { getDb } from '../lib/db/mongodb';
 import { COLLECTIONS } from '../lib/db/models';
 
-export const prerender = false;
+// ✅ STATIC: Homepage is now static for fast loading
+export const prerender = true;
 
-const token = Astro.cookies.get('auth_token')?.value;
-const isLoggedIn = !!token;
-
-Astro.response.headers.set(
-  'Cache-Control',
-  isLoggedIn
-    ? 'private, no-cache'
-    : 'public, max-age=60'
-);
-
+// Build time: Fetch all approved docs
 const db = await getDb();
 const allDocs = await db.collection(COLLECTIONS.DOC_DRAFTS)
   .find({ status: 'approved' })

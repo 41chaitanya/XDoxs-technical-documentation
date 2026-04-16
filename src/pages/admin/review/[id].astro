@@ -6,42 +6,50 @@ import { verifyToken } from '../../../lib/auth/jwt';
 import { getDocDraft } from '../../../lib/db/docs';
 import { renderMarkdown } from '../../../lib/markdown/render';
 import { extractHeadingsFromTopic, splitMarkdownIntoTopics } from '../../../lib/markdown/splitter';
+import { extractLangBlocks } from '../../../lib/markdown/lang';
 
 export const prerender = false;
 
 const token = Astro.cookies.get('auth_token')?.value;
-
-if (!token) {
-  return Astro.redirect('/login');
-}
+if (!token) return Astro.redirect('/login');
 
 const payload = verifyToken(token);
-
-if (!payload || payload.role !== 'super_admin') {
-  return Astro.redirect('/');
-}
+if (!payload || payload.role !== 'super_admin') return Astro.redirect('/');
 
 const { id } = Astro.params;
-
-if (!id) {
-  return Astro.redirect('/admin/dashboard');
-}
+if (!id) return Astro.redirect('/admin/dashboard');
 
 const draft = await getDocDraft(id);
+if (!draft) return Astro.redirect('/admin/dashboard');
 
-if (!draft) {
-  return Astro.redirect('/admin/dashboard');
-}
+// Check bilingual
+const { en: enContent, hi: hiContent } = extractLangBlocks(String(draft.content || ''));
+const isBilingual = !!hiContent;
 
-// Get topics
-let topics = draft.topics || [];
-if (topics.length === 0) {
-  topics = splitMarkdownIntoTopics(draft.content);
+// Split topics from EN content only
+const contentToSplit = isBilingual ? enContent : String(draft.content || '');
+let topics = draft.topics?.length ? draft.topics : splitMarkdownIntoTopics(contentToSplit);
+
+// For bilingual — re-split from EN only to avoid duplicate topics
+if (isBilingual) {
+  topics = splitMarkdownIntoTopics(enContent);
 }
 
 const currentTopic = topics[0];
 const headings = extractHeadingsFromTopic(currentTopic.content);
 const htmlContent = await renderMarkdown(currentTopic.content);
+
+// Extract HI topic titles and contents
+function extractHiTitles(hi: string): string[] {
+  return hi.split('\n').filter(l => /^## /.test(l)).map(l => l.replace(/^## /, '').trim());
+}
+function extractHiContents(hi: string): string[] {
+  return hi.split(/^## /gm).slice(1).map(s => '## ' + s.trim());
+}
+
+const hiTitles = isBilingual ? extractHiTitles(hiContent) : [];
+const hiContents = isBilingual ? extractHiContents(hiContent) : [];
+const initialHiHtml = isBilingual && hiContents[0] ? await renderMarkdown(hiContents[0]) : '';
 ---
 
 <BaseLayout title={`Review: ${draft.title} - Admin | XDoxs`} description={draft.description}>
@@ -71,7 +79,7 @@ const htmlContent = await renderMarkdown(currentTopic.content);
   </div>
 
   <div class="doc-container">
-    <!-- Left Sidebar with Topics -->
+    <!-- Left Sidebar: EN Topics -->
     <aside class="topics-sidebar">
       <div class="sidebar-header">
         <h3>{draft.title}</h3>
@@ -79,15 +87,25 @@ const htmlContent = await renderMarkdown(currentTopic.content);
         <div class="instructor-info">
           <small>By: {draft.instructorEmail}</small>
         </div>
+        {isBilingual && (
+          <div class="lang-toggle-review">
+            <button class="lang-btn-review active" id="review-btn-en">English</button>
+            <button class="lang-btn-review" id="review-btn-hi">Hinglish</button>
+          </div>
+        )}
       </div>
       
-      <nav class="topics-nav">
+      <nav class="topics-nav" id="topics-nav">
         {topics.map((topic, index) => (
-          <div class="topic-link" data-topic-index={index}>
-            <span class="topic-icon">
-              {topic.id === 'intro' ? '📖' : '📄'}
-            </span>
+          <div class="topic-link" data-topic-index={index} data-lang="en">
+            <span class="topic-icon">📄</span>
             <span class="topic-title">{topic.title}</span>
+          </div>
+        ))}
+        {isBilingual && hiTitles.map((title, index) => (
+          <div class="topic-link hi-topic-link" data-topic-index={index} data-lang="hi" style="display:none">
+            <span class="topic-icon">📄</span>
+            <span class="topic-title">{title}</span>
           </div>
         ))}
       </nav>
@@ -244,6 +262,31 @@ const htmlContent = await renderMarkdown(currentTopic.content);
 
     .topics-nav {
       padding: 1rem 0;
+    }
+
+    .lang-toggle-review {
+      display: flex;
+      margin-top: 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+      width: fit-content;
+    }
+
+    .lang-btn-review {
+      padding: 0.35rem 0.85rem;
+      background: var(--bg-primary);
+      color: var(--text-secondary);
+      border: none;
+      font-size: 0.75rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .lang-btn-review.active {
+      background: var(--primary);
+      color: white;
     }
 
     .topic-link {
@@ -535,7 +578,7 @@ const htmlContent = await renderMarkdown(currentTopic.content);
     }
   </style>
 
-  <script define:vars={{ draftId: String(draft._id), topics }}>
+  <script define:vars={{ draftId: String(draft._id), topics, isBilingual, hiContents }}>
     const approveBtn = document.getElementById('approve-btn');
     const rejectBtn = document.getElementById('reject-btn');
     const publishBtn = document.getElementById('publish-btn');
@@ -545,28 +588,61 @@ const htmlContent = await renderMarkdown(currentTopic.content);
     const feedbackText = document.getElementById('feedback-text');
     const contentArea = document.getElementById('content-area');
 
-    // Topic navigation
-    const topicLinks = document.querySelectorAll('.topic-link');
-    topicLinks.forEach((link, index) => {
-      link.addEventListener('click', async () => {
-        const topic = topics[index];
-        // Render topic content
-        const response = await fetch('/api/docs/render-topic', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ content: topic.content }),
-        });
-        const data = await response.json();
-        if (data.html) {
-          contentArea.innerHTML = data.html;
-        }
+    let currentLang = 'en';
+
+    // Lang toggle
+    const btnEn = document.getElementById('review-btn-en');
+    const btnHi = document.getElementById('review-btn-hi');
+
+    if (btnEn && btnHi) {
+      btnEn.addEventListener('click', () => {
+        currentLang = 'en';
+        btnEn.classList.add('active');
+        btnHi.classList.remove('active');
+        // Show EN topics, hide HI topics
+        document.querySelectorAll('.topic-link[data-lang="en"]').forEach(el => el.style.display = '');
+        document.querySelectorAll('.topic-link[data-lang="hi"]').forEach(el => el.style.display = 'none');
       });
+      btnHi.addEventListener('click', () => {
+        currentLang = 'hi';
+        btnHi.classList.add('active');
+        btnEn.classList.remove('active');
+        // Show HI topics, hide EN topics
+        document.querySelectorAll('.topic-link[data-lang="en"]').forEach(el => el.style.display = 'none');
+        document.querySelectorAll('.topic-link[data-lang="hi"]').forEach(el => el.style.display = '');
+      });
+    }
+
+    // Topic navigation
+    document.getElementById('topics-nav').addEventListener('click', async (e) => {
+      const link = e.target.closest('.topic-link');
+      if (!link) return;
+      const index = parseInt(link.dataset.topicIndex);
+      const lang = link.dataset.lang || 'en';
+
+      const content = lang === 'hi'
+        ? (hiContents[index] || '')
+        : topics[index]?.content || '';
+
+      if (!content) return;
+
+      const response = await fetch('/api/docs/render-topic', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content }),
+      });
+      const data = await response.json();
+      if (data.html) contentArea.innerHTML = data.html;
+
+      // Active state
+      document.querySelectorAll('.topic-link').forEach(l => l.classList.remove('active'));
+      link.classList.add('active');
     });
 
     // Approve
     if (approveBtn) {
       approveBtn.addEventListener('click', async () => {
-        if (!confirm('Approve and publish this documentation?')) return;
+        if (!await Dialog.confirm('Approve and publish this documentation?', 'warn', 'Approve & Publish')) return;
 
         approveBtn.disabled = true;
         approveBtn.textContent = 'Publishing...';
@@ -581,16 +657,16 @@ const htmlContent = await renderMarkdown(currentTopic.content);
           const data = await response.json();
 
           if (data.success) {
-            alert('Documentation approved and published!');
+            await Dialog.alert('Documentation approved and published!', 'info');
             window.location.href = '/admin/dashboard';
           } else {
-            alert('Error: ' + data.error);
+            await Dialog.alert('Error: ' + data.error, 'error');
             approveBtn.disabled = false;
             approveBtn.textContent = 'Approve & Publish';
           }
         } catch (error) {
           console.error('Error:', error);
-          alert('Error approving documentation');
+          await Dialog.alert('Error approving documentation', 'error');
           approveBtn.disabled = false;
           approveBtn.textContent = 'Approve & Publish';
         }
@@ -614,7 +690,7 @@ const htmlContent = await renderMarkdown(currentTopic.content);
       confirmReject.addEventListener('click', async () => {
         const feedback = feedbackText.value.trim();
         if (!feedback) {
-          alert('Please provide feedback');
+          await Dialog.alert('Please provide feedback', 'warn');
           return;
         }
 
@@ -631,16 +707,16 @@ const htmlContent = await renderMarkdown(currentTopic.content);
           const data = await response.json();
 
           if (data.success) {
-            alert('Documentation rejected');
+            await Dialog.alert('Documentation rejected', 'info');
             window.location.href = '/admin/dashboard';
           } else {
-            alert('Error: ' + data.error);
+            await Dialog.alert('Error: ' + data.error, 'error');
             confirmReject.disabled = false;
             confirmReject.textContent = 'Reject';
           }
         } catch (error) {
           console.error('Error:', error);
-          alert('Error rejecting documentation');
+          await Dialog.alert('Error rejecting documentation', 'error');
           confirmReject.disabled = false;
           confirmReject.textContent = 'Reject';
         }
@@ -650,7 +726,7 @@ const htmlContent = await renderMarkdown(currentTopic.content);
     // Publish (for already approved docs)
     if (publishBtn) {
       publishBtn.addEventListener('click', async () => {
-        if (!confirm('Publish this documentation to public?')) return;
+        if (!await Dialog.confirm('Publish this documentation to public?', 'warn', 'Publish')) return;
 
         publishBtn.disabled = true;
         publishBtn.textContent = 'Publishing...';
@@ -665,16 +741,16 @@ const htmlContent = await renderMarkdown(currentTopic.content);
           const data = await response.json();
 
           if (data.success) {
-            alert('Documentation published!');
+            await Dialog.alert('Documentation published!', 'info');
             window.location.href = '/admin/dashboard';
           } else {
-            alert('Error: ' + data.error);
+            await Dialog.alert('Error: ' + data.error, 'error');
             publishBtn.disabled = false;
             publishBtn.textContent = 'Publish to Public';
           }
         } catch (error) {
           console.error('Error:', error);
-          alert('Error publishing documentation');
+          await Dialog.alert('Error publishing documentation', 'error');
           publishBtn.disabled = false;
           publishBtn.textContent = 'Publish to Public';
         }
