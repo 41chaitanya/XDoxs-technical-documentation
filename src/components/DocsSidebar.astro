@@ -18,7 +18,7 @@ const categoryDocs = await db.collection(COLLECTIONS.DOC_DRAFTS)
 
 <aside class="docs-sidebar">
   <div class="sidebar-content">
-    <h2 class="sidebar-title">{currentCategory}</h2>
+    <p class="sidebar-title">{currentCategory}</p>
     
     <nav class="sidebar-nav">
       <ul class="doc-list">
@@ -80,7 +80,7 @@ const categoryDocs = await db.collection(COLLECTIONS.DOC_DRAFTS)
     display: block;
     padding: 0.5rem 0.75rem;
     border-radius: var(--radius-sm);
-    transition: all 0.2s ease;
+    transition: background-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
   }
 
   .doc-list a:hover {

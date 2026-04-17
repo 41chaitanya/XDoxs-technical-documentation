@@ -103,7 +103,7 @@ const draftOptions = existingDrafts.filter(d => d.status === 'draft' || d.status
             <select id="target-doc">
               <option value="new">+ Create New Documentation</option>
               {draftOptions.map(d => (
-                <option value={d._id}>{d.title} ({d.category})</option>
+                <option value={String(d._id)}>{d.title} ({d.category})</option>
               ))}
             </select>
           </div>

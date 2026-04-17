@@ -29,9 +29,9 @@ export const POST: APIRoute = async ({ request, cookies }) => {
         const t = topicMap.get(id);
         return t ? { ...t, order: index } : null;
       })
-      .filter(Boolean);
+      .filter((t): t is NonNullable<typeof t> => t !== null);
 
-    const fullContent = reordered.map((t: any) => t.content).join('\n\n');
+    const fullContent = reordered.map(t => t.content).join('\n\n');
     await updateDocDraft(draftId, { topics: reordered, content: fullContent });
 
     return new Response(JSON.stringify({ success: true }), { status: 200, headers: { 'Content-Type': 'application/json' } });

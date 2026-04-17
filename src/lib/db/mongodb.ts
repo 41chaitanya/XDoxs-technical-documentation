@@ -1,6 +1,11 @@
 // MongoDB connection
 import { MongoClient } from 'mongodb';
 
+declare global {
+  // eslint-disable-next-line no-var
+  var _mongoClientPromise: Promise<MongoClient> | undefined;
+}
+
 const MONGODB_URI = import.meta.env.MONGODB_URI || 'mongodb://localhost:27017/xdoxs';
 
 let client: MongoClient;

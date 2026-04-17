@@ -18,7 +18,7 @@ export async function publishDocToStatic(draft: DocDraft) {
     : { category: draft.category, slug: draft.slug };
 
   await db.collection(COLLECTIONS.DOC_DRAFTS).updateOne(
-    filter,
+    filter as any,
     { $set: { renderedHtml, renderedHtmlHi, status: 'approved', publishedAt: new Date() } }
   );
 
@@ -27,12 +27,11 @@ export async function publishDocToStatic(draft: DocDraft) {
 }
 
 export async function unpublishDoc(category: string, slug: string) {
-  // Clear pre-rendered HTML when unpublished
+  // Clear pre-rendered HTML when unpublished (both languages)
   const db = await getDb();
   await db.collection(COLLECTIONS.DOC_DRAFTS).updateOne(
     { category, slug },
-    { $unset: { renderedHtml: '' } }
+    { $unset: { renderedHtml: '', renderedHtmlHi: '' } }
   );
-  console.log(`✅ Unpublished: ${category}/${slug}`);
   return { success: true };
 }

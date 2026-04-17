@@ -1,7 +1,8 @@
 // Database models and types
+import type { ObjectId } from 'mongodb';
 
 export interface User {
-  _id?: string;
+  _id?: ObjectId;
   email: string;
   passwordHash: string;
   fullName: string;
@@ -18,7 +19,7 @@ export interface Topic {
 }
 
 export interface DocDraft {
-  _id?: string;
+  _id?: ObjectId;
   instructorId: string;
   instructorEmail: string;
   category: string;
@@ -38,7 +39,7 @@ export interface DocDraft {
 }
 
 export interface PublishedDoc {
-  _id?: string;
+  _id?: ObjectId;
   docDraftId: string;
   category: string;
   title: string;

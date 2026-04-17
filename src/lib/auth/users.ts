@@ -87,7 +87,7 @@ export async function createUser(data: {
   };
 
   const result = await usersCollection.insertOne(newUser);
-  newUser._id = result.insertedId.toString();
+  newUser._id = result.insertedId;
   
   return mapDbUserToUser(newUser);
 }
@@ -104,7 +104,7 @@ export async function findUserById(id: string): Promise<User | null> {
   const db = await getDb();
   const usersCollection = db.collection<DBUser>(COLLECTIONS.USERS);
   
-  const user = await usersCollection.findOne({ _id: new ObjectId(id) });
+  const user = await usersCollection.findOne({ _id: new ObjectId(id) } as any);
   return user ? mapDbUserToUser(user) : null;
 }
 
@@ -113,7 +113,7 @@ export async function updateUserRole(userId: string, role: 'instructor' | 'stude
   const usersCollection = db.collection<DBUser>(COLLECTIONS.USERS);
   
   const result = await usersCollection.findOneAndUpdate(
-    { _id: new ObjectId(userId) },
+    { _id: new ObjectId(userId) } as any,
     { $set: { role } },
     { returnDocument: 'after' }
   );

@@ -111,7 +111,7 @@ const allCategories = [...new Set([...defaultCategories, ...existingCategories])
             <select id="target-doc">
               <option value="new">+ New Documentation</option>
               {draftOptions.map(d => (
-                <option value={d._id}>{d.title} ({d.category})</option>
+                <option value={String(d._id)}>{d.title} ({d.category})</option>
               ))}
             </select>
           </div>

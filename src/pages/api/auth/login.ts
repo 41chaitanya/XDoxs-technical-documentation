@@ -42,8 +42,6 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       );
     }
 
-    console.log('✅ Password verified');
-
     // Generate JWT token
     const token = generateToken({
       userId: user.id,
@@ -51,18 +49,15 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       role: user.role,
     });
 
-    console.log('✅ Token generated');
-
     // Set cookie using Astro's cookie API
+    const isProduction = import.meta.env.PROD;
     cookies.set('auth_token', token, {
       path: '/',
       httpOnly: true,
       sameSite: 'lax',
       maxAge: 604800,
-      secure: false,
+      secure: isProduction,
     });
-
-    console.log('✅ Cookie set via Astro API');
 
     // Return success with redirect instruction
     return new Response(
