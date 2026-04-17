@@ -19,7 +19,7 @@ const userEmail = payload.email;
 const userRole = payload.role;
 ---
 
-<BaseLayout title="Instructor Dashboard - XDoxs">
+<BaseLayout title="Instructor Dashboard" noindex={true}>
   <Header />
   <div class="dashboard-container">
     <div class="dashboard-header">
@@ -310,7 +310,7 @@ const userRole = payload.role;
     }
   </style>
 
-  <script>
+  <script is:inline>
     async function loadDocs() {
       try {
         const response = await fetch('/api/docs/list');
@@ -331,29 +331,35 @@ const userRole = payload.role;
           rejected: 0,
         };
 
-        drafts.forEach(draft => {
+        drafts.forEach(function(draft) {
           if (stats[draft.status] !== undefined) {
             stats[draft.status]++;
           }
         });
 
-        document.getElementById('draft-count').textContent = String(stats.draft);
-        document.getElementById('pending-count').textContent = String(stats.pending_review);
-        document.getElementById('approved-count').textContent = String(stats.approved);
-        document.getElementById('published-count').textContent = String(stats.rejected);
+        var draftCountEl = document.getElementById('draft-count');
+        var pendingCountEl = document.getElementById('pending-count');
+        var approvedCountEl = document.getElementById('approved-count');
+        var publishedCountEl = document.getElementById('published-count');
+        if (draftCountEl) draftCountEl.textContent = String(stats.draft);
+        if (pendingCountEl) pendingCountEl.textContent = String(stats.pending_review);
+        if (approvedCountEl) approvedCountEl.textContent = String(stats.approved);
+        if (publishedCountEl) publishedCountEl.textContent = String(stats.rejected);
 
         // Render docs
+        if (!docsList) return;
+
         if (drafts.length === 0) {
-          docsList.innerHTML = `
-            <div class="empty-state">
-              <p>No documentation yet. Upload your first one!</p>
-              <a href="/instructor/docs/upload" class="btn-primary">Upload Documentation</a>
-            </div>
-          `;
+          docsList.innerHTML = '\
+            <div class="empty-state">\
+              <p>No documentation yet. Upload your first one!</p>\
+              <a href="/instructor/docs/upload" class="btn-primary">Upload Documentation</a>\
+            </div>\
+          ';
           return;
         }
 
-        docsList.innerHTML = drafts.map(draft => {
+        docsList.innerHTML = drafts.map(function(draft) {
           const statusLabel = draft.status === 'draft' ? 'Draft'
             : draft.status === 'pending_review' ? 'Pending Review'
             : draft.status === 'approved' ? 'Published'
@@ -383,11 +389,14 @@ const userRole = payload.role;
         `}).join('');
       } catch (error) {
         console.error('Error loading docs:', error);
-        document.getElementById('docs-list').innerHTML = `
-          <div class="empty-state">
-            <p>Error loading documentation. Please try again.</p>
-          </div>
-        `;
+        var docsListErr = document.getElementById('docs-list');
+        if (docsListErr) {
+          docsListErr.innerHTML = '\
+            <div class="empty-state">\
+              <p>Error loading documentation. Please try again.</p>\
+            </div>\
+          ';
+        }
       }
     }
 

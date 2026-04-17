@@ -18,6 +18,8 @@ interface Props {
 
 const { title, description, date, author, category, tags, headings, docId, topicsEn = [], topicsHi = [], hasHinglish = false } = Astro.props;
 
+const canonicalURL = new URL(Astro.url.pathname, Astro.site);
+
 const jsonLd = {
   '@context': 'https://schema.org',
   '@type': 'TechArticle',
@@ -27,48 +29,74 @@ const jsonLd = {
     '@type': 'Person',
     name: author,
   },
+  publisher: {
+    '@type': 'Organization',
+    name: 'XDoxs by Sheryians Coding School',
+    url: Astro.site?.toString(),
+  },
   datePublished: date.toISOString(),
+  dateModified: date.toISOString(),
   keywords: tags.join(', '),
+  mainEntityOfPage: {
+    '@type': 'WebPage',
+    '@id': canonicalURL.toString(),
+  },
+  inLanguage: hasHinglish ? ['en', 'hi'] : ['en'],
+};
+
+const breadcrumbLd = {
+  '@context': 'https://schema.org',
+  '@type': 'BreadcrumbList',
+  itemListElement: [
+    { '@type': 'ListItem', position: 1, name: 'Home', item: Astro.site?.toString() },
+    { '@type': 'ListItem', position: 2, name: category, item: `${Astro.site}docs/${category}` },
+    { '@type': 'ListItem', position: 3, name: title },
+  ],
 };
 ---
 
-<BaseLayout title={title} description={description}>
+<BaseLayout 
+  title={title} 
+  description={description} 
+  article={true}
+  publishedTime={date.toISOString()}
+>
   <Header />
   
   <div class="doc-container">
     <!-- Left Sidebar: Topics Navigation -->
-    <aside class="topics-sidebar">
+    <aside class="topics-sidebar" aria-label="Topics navigation">
       <div class="sidebar-content">
         <div class="doc-info">
           <h2 class="doc-title">{title}</h2>
           <span class="category-badge">{category}</span>
           {hasHinglish && (
-            <div class="lang-toggle">
-              <button class="lang-btn active" id="btn-en" onclick="switchLanguage('en')">English</button>
-              <button class="lang-btn" id="btn-hi" onclick="switchLanguage('hi')">Hinglish</button>
+            <div class="lang-toggle" role="group" aria-label="Language selection">
+              <button class="lang-btn active" id="btn-en" onclick="switchLanguage('en')" aria-pressed="true">English</button>
+              <button class="lang-btn" id="btn-hi" onclick="switchLanguage('hi')" aria-pressed="false">Hinglish</button>
             </div>
           )}
         </div>
         
         {topicsEn.length > 0 && (
-          <nav class="topics-nav">
+          <nav class="topics-nav" aria-label="Document topics">
             <h3 class="topics-heading">Topics</h3>
-            <ul class="topics-list topics-list-en">
+            <ul class="topics-list topics-list-en" role="list">
               {topicsEn.map((topic, index) => (
                 <li>
                   <a href={`#${topic.slug}`} class="topic-link" data-slug={topic.slug}>
-                    <span class="topic-number">{index + 1}</span>
+                    <span class="topic-number" aria-hidden="true">{index + 1}</span>
                     <span class="topic-title">{topic.text}</span>
                   </a>
                 </li>
               ))}
             </ul>
             {hasHinglish && topicsHi.length > 0 && (
-              <ul class="topics-list topics-list-hi" style="display:none">
+              <ul class="topics-list topics-list-hi" style="display:none" role="list">
                 {topicsHi.map((topic, index) => (
                   <li>
                     <a href={`#${topic.slug}`} class="topic-link" data-slug={topic.slug}>
-                      <span class="topic-number">{index + 1}</span>
+                      <span class="topic-number" aria-hidden="true">{index + 1}</span>
                       <span class="topic-title">{topic.text}</span>
                     </a>
                   </li>
@@ -80,36 +108,38 @@ const jsonLd = {
       </div>
     </aside>
     
-    <main class="doc-main">
-      <nav class="breadcrumb">
-        <a href="/">Home</a>
-        <span>/</span>
-        <a href="#" onclick="history.back(); return false;">Docs</a>
-        <span>/</span>
-        <span class="current">{category}</span>
+    <main class="doc-main" id="main-content">
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        <ol>
+          <li><a href="/">Home</a></li>
+          <li aria-hidden="true">/</li>
+          <li><a href="/">Docs</a></li>
+          <li aria-hidden="true">/</li>
+          <li><span class="current" aria-current="page">{category}</span></li>
+        </ol>
       </nav>
       
-      <article class="doc-article">
+      <article class="doc-article" itemscope itemtype="https://schema.org/TechArticle">
         <header class="doc-header">
-          <h1>{title}</h1>
-          <p class="doc-description">{description}</p>
+          <h1 itemprop="headline">{title}</h1>
+          <p class="doc-description" itemprop="description">{description}</p>
           
           <div class="doc-meta">
-            <span>By {author}</span>
-            <span>•</span>
-            <time datetime={date.toISOString()}>
+            <span itemprop="author">{author}</span>
+            <span aria-hidden="true">•</span>
+            <time datetime={date.toISOString()} itemprop="datePublished">
               {date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
             </time>
           </div>
           
-          <div class="tags">
+          <div class="tags" role="list" aria-label="Tags">
             {tags.map(tag => (
-              <span class="tag">{tag}</span>
+              <span class="tag" role="listitem">{tag}</span>
             ))}
           </div>
         </header>
         
-        <div class="doc-content">
+        <div class="doc-content" itemprop="articleBody">
           <slot />
         </div>
       </article>
@@ -117,6 +147,7 @@ const jsonLd = {
   </div>
   
   <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+  <script type="application/ld+json" set:html={JSON.stringify(breadcrumbLd)} />
 </BaseLayout>
 
 <style>
@@ -133,6 +164,7 @@ const jsonLd = {
     position: sticky;
     top: 64px;
     overflow-y: auto;
+    contain: layout style;
   }
 
   .sidebar-content {
@@ -157,10 +189,10 @@ const jsonLd = {
     display: inline-block;
     padding: 0.25rem 0.75rem;
     background: var(--primary-light);
-    color: var(--primary);
+    color: var(--primary-dark);
     border-radius: 999px;
     font-size: 0.75rem;
-    font-weight: 500;
+    font-weight: 600;
     text-transform: capitalize;
   }
 
@@ -191,17 +223,13 @@ const jsonLd = {
     border-radius: 6px;
     color: var(--text-secondary);
     font-size: 0.875rem;
-    transition: all 0.2s;
+    transition: background 0.15s ease, color 0.15s ease;
     border-left: 3px solid transparent;
   }
 
   .topic-link:hover {
     background: var(--bg-primary);
     color: var(--text-primary);
-  }
-
-  .topic-link:hover .topic-title {
-    text-shadow: 0 0 8px var(--primary);
   }
 
   .topic-link.active {
@@ -254,16 +282,21 @@ const jsonLd = {
     color: var(--text-secondary);
   }
 
+  .breadcrumb ol {
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0;
+  }
+
   .breadcrumb a {
     color: var(--text-secondary);
   }
 
   .breadcrumb a:hover {
     color: var(--primary);
-  }
-
-  .breadcrumb span {
-    margin: 0 0.5rem;
   }
 
   .breadcrumb .current {
@@ -276,6 +309,7 @@ const jsonLd = {
     padding: 2.5rem;
     border-radius: var(--radius);
     box-shadow: var(--shadow);
+    contain: content;
   }
 
   .doc-header {
@@ -313,14 +347,16 @@ const jsonLd = {
   .tag {
     padding: 0.25rem 0.75rem;
     background: var(--primary-light);
-    color: var(--primary);
+    color: var(--primary-dark);
     border-radius: 999px;
     font-size: 0.875rem;
-    font-weight: 500;
+    font-weight: 600;
   }
 
   .doc-content {
     line-height: 1.8;
+    content-visibility: auto;
+    contain-intrinsic-size: auto 500px;
   }
 
   .doc-content :global(h2) {
@@ -374,7 +410,7 @@ const jsonLd = {
     font-size: 0.8rem;
     font-weight: 600;
     letter-spacing: 0.05em;
-    transition: all 0.2s;
+    transition: background 0.15s ease, color 0.15s ease;
   }
 
   .lang-btn.active {
@@ -413,7 +449,7 @@ const jsonLd = {
     border: 1px solid var(--border);
     border-radius: 8px;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: border-color 0.15s ease, background 0.15s ease;
     background: var(--bg-primary);
   }
 
@@ -475,7 +511,7 @@ const jsonLd = {
     font-weight: 600;
     cursor: pointer;
     font-size: 0.9rem;
-    transition: all 0.2s;
+    transition: background 0.15s ease;
   }
 
   .doc-content :global(.mcq-submit:hover) {
@@ -531,12 +567,30 @@ const jsonLd = {
 </style>
 
 <script>
-  document.addEventListener('DOMContentLoaded', () => {
-    const topicLinks = document.querySelectorAll<HTMLAnchorElement>('.topic-link');
+  // ─── Deferred doc-page interactivity — yields to main thread to reduce TBT ───
 
-    // Smooth scroll on click
-    topicLinks.forEach(link => {
-      link.addEventListener('click', (e) => {
+  // Helper: yield control to the browser between tasks
+  function yieldToMain(): Promise<void> {
+    return new Promise(resolve => {
+      if ('scheduler' in window && 'yield' in (window as any).scheduler) {
+        (window as any).scheduler.yield().then(resolve);
+      } else {
+        setTimeout(resolve, 0);
+      }
+    });
+  }
+
+  // 1. Topic sidebar: smooth scroll + active highlight (deferred)
+  async function initTopicSidebar() {
+    const topicLinks = document.querySelectorAll<HTMLAnchorElement>('.topic-link');
+    if (topicLinks.length === 0) return;
+
+    // Use event delegation on the parent instead of per-link listeners
+    const topicsNav = document.querySelector('.topics-nav');
+    if (topicsNav) {
+      topicsNav.addEventListener('click', (e) => {
+        const link = (e.target as HTMLElement).closest<HTMLAnchorElement>('.topic-link');
+        if (!link) return;
         e.preventDefault();
         const slug = link.getAttribute('data-slug');
         if (!slug) return;
@@ -544,42 +598,34 @@ const jsonLd = {
         if (target) {
           target.scrollIntoView({ behavior: 'smooth', block: 'start' });
           history.pushState(null, '', `#${slug}`);
-          // Immediately set active
           topicLinks.forEach(l => l.classList.remove('active'));
           link.classList.add('active');
         }
       });
-    });
+    }
 
-    // Highlight active topic on scroll using IntersectionObserver
+    await yieldToMain();
+
     const headings = document.querySelectorAll<HTMLElement>('.doc-content h2[id]');
-
     if (headings.length === 0) return;
 
-    // Set first topic active by default
     topicLinks[0]?.classList.add('active');
 
     const observer = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
+      for (const entry of entries) {
         if (entry.isIntersecting) {
           const id = entry.target.id;
           topicLinks.forEach(link => {
-            const isMatch = link.getAttribute('data-slug') === id;
-            link.classList.toggle('active', isMatch);
+            link.classList.toggle('active', link.getAttribute('data-slug') === id);
           });
         }
-      });
-    }, {
-      rootMargin: '-80px 0px -70% 0px',
-      threshold: 0
-    });
+      }
+    }, { rootMargin: '-80px 0px -70% 0px', threshold: 0 });
 
     headings.forEach(h => observer.observe(h));
-  });
-</script>
+  }
 
-<script>
-  // Language toggle
+  // 2. Language toggle
   (window as any).switchLanguage = function(lang: string) {
     const en = document.querySelector<HTMLElement>('.doc-content-en');
     const hi = document.querySelector<HTMLElement>('.doc-content-hi');
@@ -588,78 +634,71 @@ const jsonLd = {
     const topicsEn = document.querySelector<HTMLElement>('.topics-list-en');
     const topicsHi = document.querySelector<HTMLElement>('.topics-list-hi');
 
-    if (lang === 'hi') {
-      if (en) en.style.display = 'none';
-      if (hi) hi.style.display = 'block';
-      if (topicsEn) topicsEn.style.display = 'none';
-      if (topicsHi) topicsHi.style.display = 'block';
-      btnEn?.classList.remove('active');
-      btnHi?.classList.add('active');
-    } else {
-      if (en) en.style.display = 'block';
-      if (hi) hi.style.display = 'none';
-      if (topicsEn) topicsEn.style.display = 'block';
-      if (topicsHi) topicsHi.style.display = 'none';
-      btnEn?.classList.add('active');
-      btnHi?.classList.remove('active');
-    }
-  };
-</script>
-
-<script>
-  (window as any).checkMcq = function(id: string) {
-    const block = document.getElementById(id);
-    if (!block) return;
-
-    const selected = block.querySelector<HTMLInputElement>('input[type="radio"]:checked');
-    if (!selected) {
-      // No option selected — shake the block
-      block.style.outline = '2px solid oklch(0.6 0.2 27)';
-      setTimeout(() => block.style.outline = '', 1000);
-      return;
-    }
-
-    const correctAnswer = block.getAttribute('data-answer');
-    const selectedValue = selected.value;
-    const options = block.querySelectorAll<HTMLElement>('.mcq-option');
-    const result = block.querySelector<HTMLElement>('.mcq-result');
-    const feedback = block.querySelector<HTMLElement>('.mcq-feedback');
-    const submitBtn = block.querySelector<HTMLButtonElement>('.mcq-submit');
-
-    // Disable further interaction
-    block.querySelectorAll<HTMLInputElement>('input[type="radio"]').forEach(r => r.disabled = true);
-    if (submitBtn) submitBtn.disabled = true;
-
-    // Highlight options
-    options.forEach(option => {
-      const letter = option.getAttribute('data-letter');
-      if (letter === correctAnswer) {
-        option.classList.add('correct');
-      } else if (letter === selectedValue) {
-        option.classList.add('wrong');
-      }
-    });
-
-    // Show result
-    if (result) result.style.display = 'block';
-    if (feedback) {
-      if (selectedValue === correctAnswer) {
-        feedback.textContent = 'Correct!';
-        feedback.style.color = 'oklch(0.5 0.15 140)';
-      } else {
-        feedback.textContent = `Wrong! Correct answer is ${correctAnswer}`;
-        feedback.style.color = 'oklch(0.5 0.2 27)';
-      }
-    }
+    const isHi = lang === 'hi';
+    if (en) en.style.display = isHi ? 'none' : 'block';
+    if (hi) hi.style.display = isHi ? 'block' : 'none';
+    if (topicsEn) topicsEn.style.display = isHi ? 'none' : 'block';
+    if (topicsHi) topicsHi.style.display = isHi ? 'block' : 'none';
+    btnEn?.classList.toggle('active', !isHi);
+    btnHi?.classList.toggle('active', isHi);
   };
 
-  // Highlight selected option on click
-  document.querySelectorAll<HTMLElement>('.mcq-option').forEach(option => {
-    option.addEventListener('click', () => {
-      const block = option.closest('.mcq-block');
+  // 3. MCQ interactive quiz blocks (deferred)
+  async function initMcq() {
+    (window as any).checkMcq = function(id: string) {
+      const block = document.getElementById(id);
       if (!block) return;
-      block.querySelectorAll('.mcq-option').forEach(o => o.classList.remove('selected'));
-      option.classList.add('selected');
-    });
-  });
+
+      const selected = block.querySelector<HTMLInputElement>('input[type="radio"]:checked');
+      if (!selected) {
+        block.style.outline = '2px solid oklch(0.6 0.2 27)';
+        setTimeout(() => block.style.outline = '', 1000);
+        return;
+      }
+
+      const correctAnswer = block.getAttribute('data-answer');
+      const selectedValue = selected.value;
+      const submitBtn = block.querySelector<HTMLButtonElement>('.mcq-submit');
+
+      block.querySelectorAll<HTMLInputElement>('input[type="radio"]').forEach(r => r.disabled = true);
+      if (submitBtn) submitBtn.disabled = true;
+
+      block.querySelectorAll<HTMLElement>('.mcq-option').forEach(option => {
+        const letter = option.getAttribute('data-letter');
+        if (letter === correctAnswer) option.classList.add('correct');
+        else if (letter === selectedValue) option.classList.add('wrong');
+      });
+
+      const result = block.querySelector<HTMLElement>('.mcq-result');
+      const feedback = block.querySelector<HTMLElement>('.mcq-feedback');
+      if (result) result.style.display = 'block';
+      if (feedback) {
+        const isCorrect = selectedValue === correctAnswer;
+        feedback.textContent = isCorrect ? 'Correct!' : `Wrong! Correct answer is ${correctAnswer}`;
+        feedback.style.color = isCorrect ? 'oklch(0.5 0.15 140)' : 'oklch(0.5 0.2 27)';
+      }
+    };
+
+    // Use event delegation for MCQ options
+    const docContent = document.querySelector('.doc-content');
+    if (docContent) {
+      docContent.addEventListener('click', (e) => {
+        const option = (e.target as HTMLElement).closest<HTMLElement>('.mcq-option');
+        if (!option) return;
+        const block = option.closest('.mcq-block');
+        if (!block) return;
+        block.querySelectorAll('.mcq-option').forEach(o => o.classList.remove('selected'));
+        option.classList.add('selected');
+      });
+    }
+  }
+
+  // Initialize: break work into small chunks to avoid long tasks
+  if ('requestIdleCallback' in window) {
+    requestIdleCallback(() => { initTopicSidebar(); });
+    requestIdleCallback(() => { initMcq(); });
+  } else {
+    setTimeout(initTopicSidebar, 0);
+    setTimeout(initMcq, 50);
+  }
 </script>

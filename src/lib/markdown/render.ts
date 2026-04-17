@@ -101,8 +101,6 @@ export async function renderMarkdown(markdown: string): Promise<string> {
   const html = await parse(processedMarkdown, {
     gfm: true, // GitHub Flavored Markdown
     breaks: false, // Don't convert single \n to <br>
-    headerIds: true, // Add IDs to headings
-    mangle: false, // Don't escape autolinked email addresses
     renderer: renderer,
     async: false,
   });

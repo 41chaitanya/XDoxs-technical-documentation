@@ -4,10 +4,44 @@ import '../styles/global.css';
 interface Props {
   title: string;
   description?: string;
+  ogImage?: string;
+  article?: boolean;
+  publishedTime?: string;
+  noindex?: boolean;
 }
 
-const { title, description = 'XDoxs - Fast, SEO-optimized documentation platform' } = Astro.props;
+const { 
+  title, 
+  description = 'XDoxs - Fast, SEO-optimized documentation platform by Sheryians Coding School',
+  ogImage,
+  article = false,
+  publishedTime,
+  noindex = false,
+} = Astro.props;
+
 const canonicalURL = new URL(Astro.url.pathname, Astro.site);
+const fullTitle = title === 'Home' ? 'XDoxs - Technical Documentation by Sheryians Coding School' : `${title} | XDoxs`;
+
+// JSON-LD for Organization (homepage) or breadcrumb
+const orgSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'Organization',
+  name: 'XDoxs',
+  url: Astro.site?.toString(),
+  description: 'Technical documentation platform by Sheryians Coding School',
+};
+
+const websiteSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'WebSite',
+  name: 'XDoxs',
+  url: Astro.site?.toString(),
+  potentialAction: {
+    '@type': 'SearchAction',
+    target: `${Astro.site}docs/{search_term_string}`,
+    'query-input': 'required name=search_term_string',
+  },
+};
 ---
 
 <!DOCTYPE html>
@@ -15,41 +49,62 @@ const canonicalURL = new URL(Astro.url.pathname, Astro.site);
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    
+    <!-- Preconnect for performance -->
+    <link rel="dns-prefetch" href="https://sheryians.com" />
+    
+    <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="generator" content={Astro.generator} />
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#0d9488" />
+    <meta name="color-scheme" content="light dark" />
+    
+    <!-- Performance: Preload critical inline resources -->
+    <link rel="preload" as="fetch" href="/api/docs/nav" crossorigin="anonymous" />
     
     <!-- SEO Meta Tags -->
-    <title>{title} | XDoxs</title>
+    <title>{fullTitle}</title>
     <meta name="description" content={description} />
     <link rel="canonical" href={canonicalURL} />
+    <meta name="generator" content={Astro.generator} />
+    {noindex && <meta name="robots" content="noindex, nofollow" />}
     
     <!-- Open Graph -->
-    <meta property="og:type" content="website" />
+    <meta property="og:type" content={article ? 'article' : 'website'} />
     <meta property="og:url" content={canonicalURL} />
-    <meta property="og:title" content={title} />
+    <meta property="og:title" content={fullTitle} />
     <meta property="og:description" content={description} />
+    <meta property="og:site_name" content="XDoxs" />
+    <meta property="og:locale" content="en_US" />
+    {ogImage && <meta property="og:image" content={ogImage} />}
+    {publishedTime && <meta property="article:published_time" content={publishedTime} />}
     
     <!-- Twitter Card -->
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content={title} />
+    <meta name="twitter:card" content={ogImage ? 'summary_large_image' : 'summary'} />
+    <meta name="twitter:title" content={fullTitle} />
     <meta name="twitter:description" content={description} />
+    {ogImage && <meta name="twitter:image" content={ogImage} />}
     
-    <!-- Custom Dialog utility (replaces alert/confirm) -->
-    <script is:inline src="/dialog.js"></script>
-
-    <!-- Global Theme Script - Runs immediately to prevent flash -->
+    <!-- Structured Data -->
+    <script type="application/ld+json" set:html={JSON.stringify(orgSchema)} />
+    <script type="application/ld+json" set:html={JSON.stringify(websiteSchema)} />
+    
+    <!-- Theme Script - Runs immediately to prevent FOUC (must be inline, must be in head) -->
     <script is:inline>
       (function() {
-        const savedHue = localStorage.getItem('theme-hue') || '165.37';
-        const root = document.documentElement;
-        root.style.setProperty('--primary', `oklch(0.6207 0.1332 ${savedHue} / 92.9%)`);
-        root.style.setProperty('--primary-hover', `oklch(0.5607 0.1432 ${savedHue} / 92.9%)`);
-        root.style.setProperty('--primary-light', `oklch(0.9 0.05 ${savedHue} / 92.9%)`);
-        root.style.setProperty('--primary-dark', `oklch(0.4 0.15 ${savedHue})`);
+        var h = localStorage.getItem('theme-hue') || '165.37';
+        var s = document.documentElement.style;
+        s.setProperty('--primary', 'oklch(0.6207 0.1332 ' + h + ' / 92.9%)');
+        s.setProperty('--primary-hover', 'oklch(0.5607 0.1432 ' + h + ' / 92.9%)');
+        s.setProperty('--primary-light', 'oklch(0.9 0.05 ' + h + ' / 92.9%)');
+        s.setProperty('--primary-dark', 'oklch(0.4 0.15 ' + h + ')');
       })();
     </script>
   </head>
   <body>
     <slot />
+    
+    <!-- Dialog utility — deferred so it never blocks rendering -->
+    <script is:inline src="/dialog.js" defer></script>
   </body>
 </html>

@@ -19,7 +19,7 @@ const categories = [...new Set(allDocs.map((doc: any) => doc.category))];
 <BaseLayout title="Home" description="XDoxs - Learn technology in depth with comprehensive documentation by Sheryians Coding School">
   <Header />
   
-  <main>
+  <main id="main-content">
     <!-- Hero -->
     <section class="hero">
       <div class="container">
@@ -27,7 +27,7 @@ const categories = [...new Set(allDocs.map((doc: any) => doc.category))];
           <div class="badge">By Sheryians Coding School</div>
           <h1>Learn Technology <span class="gradient">In Depth</span></h1>
           <p class="hero-text">
-            XDoxs is a comprehensive documentation platform by <a href="https://sheryians.com/" target="_blank" class="sheryians-link">Sheryians Coding School</a>, 
+            XDoxs is a comprehensive documentation platform by <a href="https://sheryians.com/" target="_blank" rel="noopener noreferrer" class="sheryians-link">Sheryians Coding School</a>, 
             where you can explore in-depth technical documentation and master programming concepts deeply.
           </p>
           <div class="hero-buttons">
@@ -40,7 +40,7 @@ const categories = [...new Set(allDocs.map((doc: any) => doc.category))];
                 No docs available yet
               </span>
             )}
-            <a href="https://sheryians.com/" target="_blank" class="btn btn-secondary">
+            <a href="https://sheryians.com/" target="_blank" rel="noopener noreferrer" class="btn btn-secondary">
               Visit Sheryians
             </a>
           </div>
@@ -82,7 +82,7 @@ const categories = [...new Set(allDocs.map((doc: any) => doc.category))];
               Students can create and share their own project documentation using XDoxs. 
               Document your projects, share knowledge with the community, and build your portfolio.
             </p>
-            <a href="#" class="btn btn-create">
+            <a href="/login" class="btn btn-create">
               Get Started
             </a>
           </div>
@@ -91,9 +91,9 @@ const categories = [...new Set(allDocs.map((doc: any) => doc.category))];
     </section>
   </main>
   
-  <footer class="footer">
+  <footer class="footer" role="contentinfo">
     <div class="container">
-      <p>&copy; 2026 XDoxs by <a href="https://sheryians.com/" target="_blank">Sheryians Coding School</a></p>
+      <p>&copy; 2026 XDoxs by <a href="https://sheryians.com/" target="_blank" rel="noopener noreferrer">Sheryians Coding School</a></p>
     </div>
   </footer>
 </BaseLayout>
@@ -139,8 +139,8 @@ const categories = [...new Set(allDocs.map((doc: any) => doc.category))];
     border-radius: 999px;
     font-size: 0.875rem;
     margin-bottom: 2rem;
-    color: var(--primary);
-    font-weight: 500;
+    color: var(--primary-dark);
+    font-weight: 600;
   }
 
   .hero h1 {
@@ -166,7 +166,7 @@ const categories = [...new Set(allDocs.map((doc: any) => doc.category))];
   .sheryians-link {
     color: var(--primary);
     font-weight: 700;
-    transition: all 0.2s;
+    transition: color 0.15s ease;
   }
 
   .sheryians-link:hover {
@@ -184,7 +184,7 @@ const categories = [...new Set(allDocs.map((doc: any) => doc.category))];
     padding: 0.75rem 2rem;
     border-radius: var(--radius);
     font-weight: 600;
-    transition: all 0.2s;
+    transition: background 0.15s ease, box-shadow 0.15s ease;
     display: inline-block;
   }
 
@@ -196,7 +196,6 @@ const categories = [...new Set(allDocs.map((doc: any) => doc.category))];
 
   .btn-primary:hover {
     background: var(--primary-hover);
-    transform: translateY(-2px);
     box-shadow: 0 8px 20px oklch(0 0 0 / 0.2);
   }
 
@@ -264,7 +263,6 @@ const categories = [...new Set(allDocs.map((doc: any) => doc.category))];
 
   .btn-create:hover {
     background: var(--primary-hover);
-    transform: translateY(-2px);
     box-shadow: 0 6px 16px oklch(0 0 0 / 0.15);
   }
 
@@ -281,13 +279,12 @@ const categories = [...new Set(allDocs.map((doc: any) => doc.category))];
     padding: 2rem;
     border-radius: var(--radius);
     border: 1px solid var(--border);
-    transition: all 0.3s;
+    transition: box-shadow 0.2s ease, border-color 0.2s ease;
     display: block;
     color: inherit;
   }
 
   .card:hover {
-    transform: translateY(-4px);
     box-shadow: var(--shadow-lg);
     border-color: var(--primary);
   }
@@ -321,7 +318,7 @@ const categories = [...new Set(allDocs.map((doc: any) => doc.category))];
   }
 
   .footer p {
-    color: rgba(255, 255, 255, 0.8);
+    color: rgba(255, 255, 255, 0.9);
   }
 
   .footer a {

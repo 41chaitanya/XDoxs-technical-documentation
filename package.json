@@ -8,12 +8,15 @@
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",
+    "start": "node start.mjs",
     "preview": "astro preview",
     "astro": "astro",
     "seed": "tsx scripts/seed-users.ts",
+    "seed:docs": "tsx scripts/seed-docs.ts",
     "reset:docs": "tsx scripts/reset-docs.ts"
   },
   "dependencies": {
+    "@astrojs/check": "^0.9.8",
     "@astrojs/mdx": "^5.0.3",
     "@astrojs/node": "^10.0.4",
     "@astrojs/sitemap": "^3.7.2",
@@ -25,9 +28,11 @@
     "lucide-react": "^1.7.0",
     "marked": "^17.0.6",
     "mongodb": "^7.1.1",
-    "mongoose": "^9.4.1"
+    "mongoose": "^9.4.1",
+    "typescript": "^5.9.3"
   },
   "devDependencies": {
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/marked": "^5.0.2",
     "tsx": "^4.21.0"
   }

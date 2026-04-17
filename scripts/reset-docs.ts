@@ -14,20 +14,29 @@ const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/xdoxs'
 async function resetDocs() {
   // 1. Delete .md files
   console.log('🗑️  Clearing .md files...');
-  const categories = await fs.readdir(DOCS_DIR);
   let fileCount = 0;
 
-  for (const category of categories) {
-    const categoryPath = path.join(DOCS_DIR, category);
-    const stat = await fs.stat(categoryPath);
-    if (!stat.isDirectory()) continue;
+  try {
+    await fs.access(DOCS_DIR);
+    const categories = await fs.readdir(DOCS_DIR);
 
-    const files = await fs.readdir(categoryPath);
-    for (const file of files.filter(f => f.endsWith('.md'))) {
-      await fs.unlink(path.join(categoryPath, file));
-      console.log(`   Deleted: ${category}/${file}`);
-      fileCount++;
+    for (const category of categories) {
+      if (category === '.gitkeep') continue;
+      const categoryPath = path.join(DOCS_DIR, category);
+      const stat = await fs.stat(categoryPath);
+      if (!stat.isDirectory()) continue;
+
+      const files = await fs.readdir(categoryPath);
+      for (const file of files.filter(f => f.endsWith('.md'))) {
+        await fs.unlink(path.join(categoryPath, file));
+        console.log(`   Deleted: ${category}/${file}`);
+        fileCount++;
+      }
     }
+  } catch {
+    // Directory doesn't exist — create it
+    await fs.mkdir(DOCS_DIR, { recursive: true });
+    console.log('   ℹ️  src/content/docs directory created');
   }
   console.log(`   ✅ ${fileCount} file(s) removed\n`);
 

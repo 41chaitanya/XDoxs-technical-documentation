@@ -2,20 +2,21 @@
 // ✅ NO SERVER-SIDE DATA FETCHING - All data loaded client-side for static pages
 ---
 
-<header class="header">
+<a href="#main-content" class="skip-to-content">Skip to content</a>
+<header class="header" role="banner">
   <div class="container">
-    <nav class="nav">
-      <a href="/" class="logo">XDoxs</a>
+    <nav class="nav" aria-label="Main navigation">
+      <a href="/" class="logo" aria-label="XDoxs - Home">XDoxs</a>
       
       <div class="nav-links">
         <!-- Docs Dropdown -->
         <div class="dropdown">
-          <a href="#" class="dropdown-trigger">
+          <button class="dropdown-trigger" aria-expanded="false" aria-haspopup="true" aria-label="Documentation menu">
             Docs
-            <svg class="dropdown-arrow" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg class="dropdown-arrow" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <polyline points="6 9 12 15 18 9"></polyline>
             </svg>
-          </a>
+          </button>
           
           <div class="dropdown-menu">
             <div class="dropdown-content" id="docs-nav-content">
@@ -24,12 +25,12 @@
           </div>
         </div>
         
-        <a href="https://github.com/yourusername/xdoxs" target="_blank">GitHub</a>
+        <a href="https://github.com/yourusername/xdoxs" target="_blank" rel="noopener noreferrer">GitHub</a>
         
         <!-- Theme Selector (Sun Icon) -->
         <div class="theme-selector">
-          <button class="theme-btn" aria-label="Change theme">
-            <svg class="theme-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <button class="theme-btn" aria-label="Change theme color" aria-expanded="false" aria-haspopup="true">
+            <svg class="theme-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <circle cx="12" cy="12" r="5"></circle>
               <line x1="12" y1="1" x2="12" y2="3"></line>
               <line x1="12" y1="21" x2="12" y2="23"></line>
@@ -72,10 +73,11 @@
           </div>
         </div>
         
-        <div class="user-profile" style="display: none;">
-          <button class="profile-btn" aria-label="User profile">
-            <div class="profile-avatar">U</div>
-          </button>
+        <div class="auth-slot">
+          <div class="user-profile">
+            <button class="profile-btn" aria-label="User profile">
+              <div class="profile-avatar">U</div>
+            </button>
           
           <div class="profile-dropdown">
             <div class="profile-info">
@@ -113,7 +115,8 @@
           </div>
         </div>
         
-        <a href="/login" class="login-btn" style="display: block;">Login</a>
+        <a href="/login" class="login-btn">Login</a>
+        </div>
       </div>
     </nav>
   </div>
@@ -121,18 +124,19 @@
 
 <style>
   .header {
-    background: oklch(1 0 0 / 0.8);
+    background: oklch(1 0 0 / 0.95);
     border-bottom: 1px solid var(--border);
     position: sticky;
     top: 0;
     z-index: 100;
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    /* Explicit height prevents CLS from header layout shifts */
+    height: 65px;
+    contain: layout style;
   }
 
   @media (prefers-color-scheme: dark) {
     .header {
-      background: oklch(0.15 0 0 / 0.8);
+      background: oklch(0.15 0 0 / 0.95);
     }
   }
 
@@ -156,12 +160,14 @@
     display: flex;
     gap: 2rem;
     align-items: center;
+    /* Prevent CLS when auth state swaps login-btn <-> user-profile */
+    contain: layout style;
   }
 
   .nav-links > a {
     color: var(--text-primary);
     font-weight: 500;
-    transition: all 0.2s ease;
+    transition: color 0.15s ease;
     position: relative;
   }
 
@@ -191,7 +197,7 @@
     padding: 0.5rem 1.25rem;
     border-radius: var(--radius-sm);
     font-weight: 600;
-    transition: all 0.2s ease;
+    transition: background 0.15s ease, box-shadow 0.15s ease;
   }
 
   .login-btn::after {
@@ -200,7 +206,6 @@
 
   .login-btn:hover {
     background: var(--primary-hover);
-    transform: translateY(-1px);
     box-shadow: 0 4px 8px oklch(0 0 0 / 0.15);
   }
 
@@ -215,8 +220,14 @@
     display: flex;
     align-items: center;
     gap: 0.25rem;
-    transition: all 0.2s ease;
+    transition: color 0.15s ease;
     position: relative;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: inherit;
+    font-family: inherit;
+    padding: 0;
   }
 
   .dropdown-trigger::after {
@@ -257,10 +268,11 @@
     box-shadow: var(--shadow-lg);
     opacity: 0;
     visibility: hidden;
-    transition: all 0.2s ease;
+    transition: opacity 0.15s ease, visibility 0.15s ease;
     min-width: 500px;
     max-height: 70vh;
     overflow-y: auto;
+    will-change: opacity;
   }
 
   @media (prefers-color-scheme: dark) {
@@ -313,7 +325,7 @@
     color: var(--text-primary);
     font-size: 0.9rem;
     border-radius: var(--radius-sm);
-    transition: all 0.2s ease;
+    transition: background 0.15s ease, color 0.15s ease;
     display: block;
     white-space: nowrap;
     overflow: hidden;
@@ -323,7 +335,6 @@
   .dropdown-item:hover {
     background: var(--primary-light);
     color: var(--primary);
-    transform: translateX(4px);
   }
 
   /* Theme Selector */
@@ -338,7 +349,7 @@
     cursor: pointer;
     padding: 0.5rem;
     border-radius: var(--radius-sm);
-    transition: all 0.2s ease;
+    transition: background 0.15s ease;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -349,14 +360,13 @@
   }
 
   .theme-icon {
-    transition: all 0.3s ease;
+    transition: transform 0.2s ease;
     stroke: var(--primary);
     filter: drop-shadow(0 0 4px var(--primary));
   }
 
   .theme-btn:hover .theme-icon {
     transform: rotate(45deg);
-    filter: drop-shadow(0 0 8px var(--primary));
   }
 
   .theme-dropdown {
@@ -369,8 +379,9 @@
     box-shadow: var(--shadow-lg);
     opacity: 0;
     visibility: hidden;
-    transition: all 0.2s ease;
+    transition: opacity 0.15s ease, visibility 0.15s ease;
     padding: 0.75rem;
+    will-change: opacity;
   }
 
   @media (prefers-color-scheme: dark) {
@@ -396,7 +407,7 @@
     cursor: pointer;
     padding: 0.25rem;
     border-radius: 50%;
-    transition: all 0.2s ease;
+    transition: transform 0.15s ease;
   }
 
   .theme-option:hover {
@@ -409,12 +420,33 @@
     height: 28px;
     border-radius: 50%;
     border: 2px solid var(--border);
-    transition: all 0.2s ease;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
   }
 
   .theme-option:hover .theme-circle {
     border-color: var(--text-primary);
     box-shadow: 0 0 0 2px var(--bg-primary), 0 0 0 4px var(--border);
+  }
+
+  /* Auth slot: fixed-size container so login<->profile swap causes zero CLS */
+  .auth-slot {
+    position: relative;
+    min-width: 80px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+  }
+
+  .auth-slot .login-btn {
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+  }
+
+  .auth-slot .user-profile {
+    visibility: hidden;
   }
 
   /* User Profile */
@@ -428,7 +460,6 @@
     cursor: pointer;
     padding: 0;
     border-radius: 50%;
-    transition: all 0.2s ease;
   }
 
   .profile-avatar {
@@ -442,11 +473,9 @@
     justify-content: center;
     font-weight: 600;
     font-size: 0.9rem;
-    transition: all 0.2s ease;
   }
 
   .profile-btn:hover .profile-avatar {
-    transform: scale(1.05);
     box-shadow: 0 0 0 3px var(--primary-light);
   }
 
@@ -460,8 +489,9 @@
     box-shadow: var(--shadow-lg);
     opacity: 0;
     visibility: hidden;
-    transition: all 0.2s ease;
+    transition: opacity 0.15s ease, visibility 0.15s ease;
     min-width: 220px;
+    will-change: opacity;
   }
 
   @media (prefers-color-scheme: dark) {
@@ -519,7 +549,7 @@
     color: var(--text-primary);
     font-size: 0.9rem;
     border-radius: var(--radius-sm);
-    transition: all 0.2s ease;
+    transition: background 0.15s ease, color 0.15s ease;
     background: none;
     border: none;
     cursor: pointer;
@@ -561,23 +591,9 @@
 </style>
 
 <script>
-  // Theme selector
+  // Theme selector — synchronous (needed immediately to prevent FOUC)
   const themeOptions = document.querySelectorAll('.theme-option');
   const root = document.documentElement;
-
-  // Load saved theme
-  const savedHue = localStorage.getItem('theme-hue') || '165.37';
-  applyTheme(savedHue);
-
-  themeOptions.forEach(option => {
-    option.addEventListener('click', () => {
-      const hue = option.getAttribute('data-hue');
-      if (hue) {
-        applyTheme(hue);
-        localStorage.setItem('theme-hue', hue);
-      }
-    });
-  });
 
   function applyTheme(hue: string) {
     root.style.setProperty('--primary', `oklch(0.6207 0.1332 ${hue} / 92.9%)`);
@@ -586,15 +602,25 @@
     root.style.setProperty('--primary-dark', `oklch(0.4 0.15 ${hue})`);
   }
 
-  // Load docs navigation
+  // Use event delegation for theme options
+  const themeOptionsContainer = document.querySelector('.theme-options');
+  if (themeOptionsContainer) {
+    themeOptionsContainer.addEventListener('click', (e) => {
+      const option = (e.target as HTMLElement).closest<HTMLElement>('.theme-option');
+      if (!option) return;
+      const hue = option.getAttribute('data-hue');
+      if (hue) {
+        applyTheme(hue);
+        localStorage.setItem('theme-hue', hue);
+      }
+    });
+  }
+
+  // Load docs navigation — deferred, non-critical
   async function loadDocsNav() {
     try {
-      console.log('🔍 Loading docs navigation...');
       const response = await fetch('/api/docs/nav');
-      console.log('📡 Response status:', response.status);
-      
       const data = await response.json();
-      console.log('📦 Data received:', data);
       
       if (data.success) {
         const navContent = document.getElementById('docs-nav-content');
@@ -615,16 +641,10 @@
             `;
           }).join('');
           
-          console.log('✅ Navigation HTML generated, updating DOM');
           navContent.innerHTML = html;
-        } else {
-          console.error('❌ docs-nav-content element not found');
         }
-      } else {
-        console.error('❌ API returned error:', data.error);
       }
-    } catch (error) {
-      console.error('❌ Error loading docs nav:', error);
+    } catch (_) {
       const navContent = document.getElementById('docs-nav-content');
       if (navContent) {
         navContent.innerHTML = '<div class="dropdown-loading">Failed to load</div>';
@@ -632,26 +652,21 @@
     }
   }
 
-  // Logout functionality
+  // Logout — use event delegation
   const logoutBtn = document.getElementById('logout-btn');
   if (logoutBtn) {
     logoutBtn.addEventListener('click', async () => {
       try {
         await fetch('/api/auth/logout', { method: 'POST' });
-        window.location.href = '/';
-      } catch (error) {
-        console.error('Logout error:', error);
-        window.location.href = '/';
-      }
+      } catch (_) {}
+      window.location.href = '/';
     });
   }
   
-  // Client-side auth check for static pages
+  // Client-side auth check — deferred, non-critical
   async function checkAuthState() {
     try {
-      const response = await fetch('/api/auth/me', {
-        credentials: 'include'
-      });
+      const response = await fetch('/api/auth/me', { credentials: 'include' });
       
       if (response.ok) {
         const data = await response.json();
@@ -661,7 +676,7 @@
           
           if (loginBtn) loginBtn.style.display = 'none';
           if (userProfile) {
-            userProfile.style.display = 'block';
+            userProfile.style.visibility = 'visible';
             const profileName = userProfile.querySelector('.profile-name');
             const profileRole = userProfile.querySelector('.profile-role');
             const profileAvatar = userProfile.querySelector('.profile-avatar');
@@ -682,12 +697,16 @@
           }
         }
       }
-    } catch (error) {
-      console.error('Auth check error:', error);
-    }
+    } catch (_) {}
   }
   
-  // Initialize on page load
-  loadDocsNav();
-  checkAuthState();
+  // Initialize — stagger deferred work to avoid long tasks
+  // Nav and auth are fired in parallel but after idle
+  if ('requestIdleCallback' in window) {
+    requestIdleCallback(() => { loadDocsNav(); }, { timeout: 2000 });
+    requestIdleCallback(() => { checkAuthState(); }, { timeout: 3000 });
+  } else {
+    setTimeout(loadDocsNav, 100);
+    setTimeout(checkAuthState, 200);
+  }
 </script>
