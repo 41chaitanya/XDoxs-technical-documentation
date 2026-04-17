@@ -60,6 +60,7 @@ const breadcrumbLd = {
   description={description} 
   article={true}
   publishedTime={date.toISOString()}
+  minimal={true}
 >
   <Header />
   
@@ -68,7 +69,7 @@ const breadcrumbLd = {
     <aside class="topics-sidebar" aria-label="Topics navigation">
       <div class="sidebar-content">
         <div class="doc-info">
-          <h2 class="doc-title">{title}</h2>
+          <p class="doc-title">{title}</p>
           <span class="category-badge">{category}</span>
           {hasHinglish && (
             <div class="lang-toggle" role="group" aria-label="Language selection">
@@ -80,7 +81,7 @@ const breadcrumbLd = {
         
         {topicsEn.length > 0 && (
           <nav class="topics-nav" aria-label="Document topics">
-            <h3 class="topics-heading">Topics</h3>
+            <p class="topics-heading">Topics</p>
             <ul class="topics-list topics-list-en" role="list">
               {topicsEn.map((topic, index) => (
                 <li>
@@ -316,6 +317,7 @@ const breadcrumbLd = {
     margin-bottom: 2rem;
     padding-bottom: 2rem;
     border-bottom: 1px solid var(--border);
+    contain: layout style;
   }
 
   .doc-header h1 {
@@ -342,6 +344,8 @@ const breadcrumbLd = {
     display: flex;
     flex-wrap: wrap;
     gap: 0.5rem;
+    min-height: 30px;
+    contain: layout style;
   }
 
   .tag {
@@ -355,8 +359,6 @@ const breadcrumbLd = {
 
   .doc-content {
     line-height: 1.8;
-    content-visibility: auto;
-    contain-intrinsic-size: auto 500px;
   }
 
   .doc-content :global(h2) {
@@ -566,139 +568,79 @@ const breadcrumbLd = {
   }
 </style>
 
-<script>
-  // ─── Deferred doc-page interactivity — yields to main thread to reduce TBT ───
-
-  // Helper: yield control to the browser between tasks
-  function yieldToMain(): Promise<void> {
-    return new Promise(resolve => {
-      if ('scheduler' in window && 'yield' in (window as any).scheduler) {
-        (window as any).scheduler.yield().then(resolve);
-      } else {
-        setTimeout(resolve, 0);
+<script is:inline>
+  // ─── Minimal doc-page interactivity — all deferred to idle time ───
+  function _initDoc() {
+    // Topic sidebar: event delegation + IntersectionObserver
+    var links = document.querySelectorAll('.topic-link');
+    var nav = document.querySelector('.topics-nav');
+    if (nav && links.length) {
+      nav.addEventListener('click', function(e) {
+        var a = e.target.closest('.topic-link');
+        if (!a) return;
+        e.preventDefault();
+        var s = a.getAttribute('data-slug');
+        var t = s && document.getElementById(s);
+        if (t) {
+          t.scrollIntoView({behavior:'smooth',block:'start'});
+          history.pushState(null,'','#'+s);
+          links.forEach(function(l){l.classList.remove('active')});
+          a.classList.add('active');
+        }
+      });
+      links[0].classList.add('active');
+      var hh = document.querySelectorAll('.doc-content h2[id]');
+      if (hh.length) {
+        var obs = new IntersectionObserver(function(entries) {
+          entries.forEach(function(en) {
+            if (en.isIntersecting) {
+              var id = en.target.id;
+              links.forEach(function(l){ l.classList.toggle('active', l.getAttribute('data-slug')===id); });
+            }
+          });
+        }, {rootMargin:'-80px 0px -70% 0px'});
+        hh.forEach(function(h){obs.observe(h)});
+      }
+    }
+    // MCQ: event delegation on doc-content
+    var dc = document.querySelector('.doc-content');
+    if (dc) dc.addEventListener('click', function(e) {
+      var opt = e.target.closest('.mcq-option');
+      if (opt) {
+        var blk = opt.closest('.mcq-block');
+        if (blk) { blk.querySelectorAll('.mcq-option').forEach(function(o){o.classList.remove('selected')}); opt.classList.add('selected'); }
       }
     });
-  }
-
-  // 1. Topic sidebar: smooth scroll + active highlight (deferred)
-  async function initTopicSidebar() {
-    const topicLinks = document.querySelectorAll<HTMLAnchorElement>('.topic-link');
-    if (topicLinks.length === 0) return;
-
-    // Use event delegation on the parent instead of per-link listeners
-    const topicsNav = document.querySelector('.topics-nav');
-    if (topicsNav) {
-      topicsNav.addEventListener('click', (e) => {
-        const link = (e.target as HTMLElement).closest<HTMLAnchorElement>('.topic-link');
-        if (!link) return;
-        e.preventDefault();
-        const slug = link.getAttribute('data-slug');
-        if (!slug) return;
-        const target = document.getElementById(slug);
-        if (target) {
-          target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          history.pushState(null, '', `#${slug}`);
-          topicLinks.forEach(l => l.classList.remove('active'));
-          link.classList.add('active');
-        }
+    // MCQ check function
+    window.checkMcq = function(id) {
+      var b = document.getElementById(id);
+      if (!b) return;
+      var sel = b.querySelector('input[type="radio"]:checked');
+      if (!sel) { b.style.outline='2px solid oklch(0.6 0.2 27)'; setTimeout(function(){b.style.outline=''},1000); return; }
+      var ca = b.getAttribute('data-answer'), sv = sel.value, sb = b.querySelector('.mcq-submit');
+      b.querySelectorAll('input[type="radio"]').forEach(function(r){r.disabled=true});
+      if (sb) sb.disabled = true;
+      b.querySelectorAll('.mcq-option').forEach(function(o) {
+        var lt = o.getAttribute('data-letter');
+        if (lt===ca) o.classList.add('correct');
+        else if (lt===sv) o.classList.add('wrong');
       });
-    }
-
-    await yieldToMain();
-
-    const headings = document.querySelectorAll<HTMLElement>('.doc-content h2[id]');
-    if (headings.length === 0) return;
-
-    topicLinks[0]?.classList.add('active');
-
-    const observer = new IntersectionObserver((entries) => {
-      for (const entry of entries) {
-        if (entry.isIntersecting) {
-          const id = entry.target.id;
-          topicLinks.forEach(link => {
-            link.classList.toggle('active', link.getAttribute('data-slug') === id);
-          });
-        }
-      }
-    }, { rootMargin: '-80px 0px -70% 0px', threshold: 0 });
-
-    headings.forEach(h => observer.observe(h));
-  }
-
-  // 2. Language toggle
-  (window as any).switchLanguage = function(lang: string) {
-    const en = document.querySelector<HTMLElement>('.doc-content-en');
-    const hi = document.querySelector<HTMLElement>('.doc-content-hi');
-    const btnEn = document.getElementById('btn-en');
-    const btnHi = document.getElementById('btn-hi');
-    const topicsEn = document.querySelector<HTMLElement>('.topics-list-en');
-    const topicsHi = document.querySelector<HTMLElement>('.topics-list-hi');
-
-    const isHi = lang === 'hi';
-    if (en) en.style.display = isHi ? 'none' : 'block';
-    if (hi) hi.style.display = isHi ? 'block' : 'none';
-    if (topicsEn) topicsEn.style.display = isHi ? 'none' : 'block';
-    if (topicsHi) topicsHi.style.display = isHi ? 'block' : 'none';
-    btnEn?.classList.toggle('active', !isHi);
-    btnHi?.classList.toggle('active', isHi);
-  };
-
-  // 3. MCQ interactive quiz blocks (deferred)
-  async function initMcq() {
-    (window as any).checkMcq = function(id: string) {
-      const block = document.getElementById(id);
-      if (!block) return;
-
-      const selected = block.querySelector<HTMLInputElement>('input[type="radio"]:checked');
-      if (!selected) {
-        block.style.outline = '2px solid oklch(0.6 0.2 27)';
-        setTimeout(() => block.style.outline = '', 1000);
-        return;
-      }
-
-      const correctAnswer = block.getAttribute('data-answer');
-      const selectedValue = selected.value;
-      const submitBtn = block.querySelector<HTMLButtonElement>('.mcq-submit');
-
-      block.querySelectorAll<HTMLInputElement>('input[type="radio"]').forEach(r => r.disabled = true);
-      if (submitBtn) submitBtn.disabled = true;
-
-      block.querySelectorAll<HTMLElement>('.mcq-option').forEach(option => {
-        const letter = option.getAttribute('data-letter');
-        if (letter === correctAnswer) option.classList.add('correct');
-        else if (letter === selectedValue) option.classList.add('wrong');
-      });
-
-      const result = block.querySelector<HTMLElement>('.mcq-result');
-      const feedback = block.querySelector<HTMLElement>('.mcq-feedback');
-      if (result) result.style.display = 'block';
-      if (feedback) {
-        const isCorrect = selectedValue === correctAnswer;
-        feedback.textContent = isCorrect ? 'Correct!' : `Wrong! Correct answer is ${correctAnswer}`;
-        feedback.style.color = isCorrect ? 'oklch(0.5 0.15 140)' : 'oklch(0.5 0.2 27)';
-      }
+      var rs = b.querySelector('.mcq-result'), fb = b.querySelector('.mcq-feedback');
+      if (rs) rs.style.display='block';
+      if (fb) { var ok=sv===ca; fb.textContent=ok?'Correct!':'Wrong! Correct answer is '+ca; fb.style.color=ok?'oklch(0.5 0.15 140)':'oklch(0.5 0.2 27)'; }
     };
-
-    // Use event delegation for MCQ options
-    const docContent = document.querySelector('.doc-content');
-    if (docContent) {
-      docContent.addEventListener('click', (e) => {
-        const option = (e.target as HTMLElement).closest<HTMLElement>('.mcq-option');
-        if (!option) return;
-        const block = option.closest('.mcq-block');
-        if (!block) return;
-        block.querySelectorAll('.mcq-option').forEach(o => o.classList.remove('selected'));
-        option.classList.add('selected');
-      });
-    }
+    // Language toggle
+    window.switchLanguage = function(lang) {
+      var en=document.querySelector('.doc-content-en'),hi=document.querySelector('.doc-content-hi');
+      var be=document.getElementById('btn-en'),bh=document.getElementById('btn-hi');
+      var te=document.querySelector('.topics-list-en'),th=document.querySelector('.topics-list-hi');
+      var isHi=lang==='hi';
+      if(en)en.style.display=isHi?'none':'block'; if(hi)hi.style.display=isHi?'block':'none';
+      if(te)te.style.display=isHi?'none':'block'; if(th)th.style.display=isHi?'block':'none';
+      if(be)be.classList.toggle('active',!isHi); if(bh)bh.classList.toggle('active',isHi);
+    };
   }
-
-  // Initialize: break work into small chunks to avoid long tasks
-  if ('requestIdleCallback' in window) {
-    requestIdleCallback(() => { initTopicSidebar(); });
-    requestIdleCallback(() => { initMcq(); });
-  } else {
-    setTimeout(initTopicSidebar, 0);
-    setTimeout(initMcq, 50);
-  }
+  // Defer ALL work to idle time — zero main-thread blocking
+  if (window.requestIdleCallback) requestIdleCallback(_initDoc);
+  else setTimeout(_initDoc, 1);
 </script>
