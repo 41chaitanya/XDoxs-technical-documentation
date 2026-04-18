@@ -2,6 +2,8 @@ import type { APIRoute } from 'astro';
 import { verifyToken } from '../../../lib/auth/jwt';
 import { getDocDraft, updateDocDraft } from '../../../lib/db/docs';
 import { publishDocToStatic } from '../../../lib/docs/publisher';
+import { uploadMarkdown } from '../../../lib/aws/s3';
+import { triggerBuild } from '../../../lib/aws/codebuild';
 
 export const POST: APIRoute = async ({ request, cookies }) => {
   try {
@@ -40,6 +42,9 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       });
     }
     
+    // Detect if this is a first publish or republish
+    const isRepublish = !!draft.publishedAt;
+
     // Pre-render HTML and save — do this BEFORE status update
     await publishDocToStatic(draft);
 
@@ -49,26 +54,25 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       publishedAt: new Date(),
     });
 
-    // 🚀 Trigger rebuild on Vercel (if deploy hook is configured)
-    const deployHook = import.meta.env.VERCEL_DEPLOY_HOOK;
-    if (deployHook) {
-      try {
-        await fetch(deployHook, { method: 'POST' });
-        console.log('✅ Rebuild triggered on Vercel');
-      } catch (error) {
-        console.error('❌ Failed to trigger rebuild:', error);
-        // Don't fail the approval if rebuild fails
-      }
-    } else {
-      console.log('⚠️ No deploy hook configured - manual rebuild required');
+    // Sync final markdown to S3
+    try {
+      await uploadMarkdown(draft.category, draft.slug, draft.content || '');
+    } catch (s3Err) {
+      console.error('S3 sync failed (non-blocking):', s3Err);
     }
+
+    // 🚀 Trigger CodeBuild with smart invalidation
+    const invalidationType = isRepublish ? 'republish' : 'new';
+    const buildId = await triggerBuild(invalidationType, draft.category, draft.slug);
     
     return new Response(
       JSON.stringify({ 
         success: true,
-        message: deployHook 
-          ? 'Document approved and rebuild triggered' 
-          : 'Document approved - manual rebuild required'
+        isRepublish,
+        buildId,
+        message: buildId 
+          ? `Document approved and build triggered (${invalidationType})` 
+          : 'Document approved — manual rebuild required'
       }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },

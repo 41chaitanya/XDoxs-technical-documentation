@@ -2,6 +2,8 @@ import type { APIRoute } from 'astro';
 import { verifyToken } from '../../../lib/auth/jwt';
 import { getDocDraft } from '../../../lib/db/docs';
 import { publishDocToStatic } from '../../../lib/docs/publisher';
+import { uploadMarkdown } from '../../../lib/aws/s3';
+import { triggerBuild } from '../../../lib/aws/codebuild';
 
 export const POST: APIRoute = async ({ request, cookies }) => {
   try {
@@ -35,7 +37,15 @@ export const POST: APIRoute = async ({ request, cookies }) => {
 
     await publishDocToStatic(draft);
 
-    return new Response(JSON.stringify({ success: true }), {
+    // Sync to S3 and trigger rebuild (always a republish since doc already exists)
+    try {
+      await uploadMarkdown(draft.category, draft.slug, draft.content || '');
+    } catch (s3Err) {
+      console.error('S3 sync failed (non-blocking):', s3Err);
+    }
+    const buildId = await triggerBuild('republish', draft.category, draft.slug);
+
+    return new Response(JSON.stringify({ success: true, buildId }), {
       status: 200, headers: { 'Content-Type': 'application/json' },
     });
   } catch (error) {

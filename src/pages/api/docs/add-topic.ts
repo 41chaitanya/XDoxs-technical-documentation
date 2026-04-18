@@ -2,6 +2,7 @@ import type { APIRoute } from 'astro';
 import { verifyToken } from '../../../lib/auth/jwt';
 import { getDocDraft, updateDocDraft } from '../../../lib/db/docs';
 import type { Topic } from '../../../lib/db/models';
+import { uploadMarkdown } from '../../../lib/aws/s3';
 
 export const POST: APIRoute = async ({ request, cookies }) => {
   try {
@@ -39,6 +40,9 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     // Rebuild full content from topics
     const fullContent = topics.map(t => t.content).join('\n\n');
     await updateDocDraft(draftId, { topics, content: fullContent });
+
+    // Sync to S3
+    try { await uploadMarkdown(draft.category, draft.slug, fullContent); } catch (e) { console.error('S3 sync failed:', e); }
 
     return new Response(JSON.stringify({ success: true, topic: newTopic }), { status: 200, headers: { 'Content-Type': 'application/json' } });
   } catch (error) {

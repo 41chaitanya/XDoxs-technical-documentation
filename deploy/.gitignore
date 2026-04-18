@@ -1,0 +1,13 @@
+# Terraform state and secrets — never commit these
+*.tfstate
+*.tfstate.backup
+.terraform/
+.terraform.lock.hcl
+terraform.tfvars
+*.auto.tfvars
+
+# SSH key pairs — NEVER commit
+*.pem
+
+# Plan files
+*.tfplan
