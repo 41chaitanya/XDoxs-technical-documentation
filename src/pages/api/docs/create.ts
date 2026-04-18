@@ -2,6 +2,7 @@ import type { APIRoute } from 'astro';
 import { verifyToken } from '../../../lib/auth/jwt';
 import { createDocDraft } from '../../../lib/db/docs';
 import { splitMarkdownIntoTopics } from '../../../lib/markdown/splitter';
+import { uploadMarkdown } from '../../../lib/aws/s3';
 
 export const POST: APIRoute = async ({ request, cookies }) => {
   try {
@@ -47,6 +48,15 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       topics,
       tags: tags || [],
     });
+
+    // Sync markdown content to S3 for durable storage
+    if (content) {
+      try {
+        await uploadMarkdown(category, slug, content);
+      } catch (s3Err) {
+        console.error('S3 upload failed (non-blocking):', s3Err);
+      }
+    }
     
     return new Response(JSON.stringify({ success: true, draft }), {
       status: 201,

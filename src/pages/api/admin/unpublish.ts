@@ -2,6 +2,7 @@ import type { APIRoute } from 'astro';
 import { verifyToken } from '../../../lib/auth/jwt';
 import { getDocDraft, updateDocDraft } from '../../../lib/db/docs';
 import { unpublishDoc } from '../../../lib/docs/publisher';
+import { triggerBuild } from '../../../lib/aws/codebuild';
 
 export const POST: APIRoute = async ({ request, cookies }) => {
   try {
@@ -43,7 +44,10 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     // Revert status back to draft in MongoDB
     await updateDocDraft(draftId, { status: 'draft' });
 
-    return new Response(JSON.stringify({ success: true }), {
+    // Trigger rebuild to remove unpublished doc from static site + invalidate CloudFront
+    const buildId = await triggerBuild('unpublish', draft.category, draft.slug);
+
+    return new Response(JSON.stringify({ success: true, buildId }), {
       status: 200, headers: { 'Content-Type': 'application/json' },
     });
   } catch (error) {

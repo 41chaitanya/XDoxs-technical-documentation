@@ -1,0 +1,74 @@
+# ─────────────────────────────────────────────────────────────
+# XDoxs CodeBuild Buildspec
+#
+# Triggered by:
+#   1. Admin approve/publish/unpublish API → smart invalidation
+#   2. GitHub Actions CI/CD → full invalidation
+#
+# Environment variables (passed as overrides):
+#   INVALIDATION_TYPE: "new" | "republish" | "unpublish" | "full"
+#   DOC_CATEGORY:      Category of the changed doc (optional)
+#   DOC_SLUG:          Slug of the changed doc (optional)
+#
+# Static env vars (set in CodeBuild project):
+#   MONGODB_URI, JWT_SECRET, S3_STATIC_BUCKET,
+#   CLOUDFRONT_DISTRIBUTION_ID, AWS_REGION
+# ─────────────────────────────────────────────────────────────
+
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      nodejs: 22
+    commands:
+      - echo "=== Installing dependencies ==="
+      - npm ci
+
+  build:
+    commands:
+      - echo "=== Building Astro static site ==="
+      - npm run build
+      - echo "=== Build complete ==="
+
+  post_build:
+    commands:
+      - echo "=== Syncing dist/client/ to S3 ==="
+      - aws s3 sync dist/client/ s3://$S3_STATIC_BUCKET/ --delete --cache-control "public, max-age=86400"
+
+      # Set immutable cache headers for hashed assets
+      - |
+        aws s3 sync dist/client/_astro/ s3://$S3_STATIC_BUCKET/_astro/ \
+          --cache-control "public, max-age=31536000, immutable"
+
+      # ─── Smart Cache Invalidation ────────────────────────
+      - echo "=== Invalidation type: $INVALIDATION_TYPE ==="
+      - |
+        if [ "$INVALIDATION_TYPE" = "republish" ] || [ "$INVALIDATION_TYPE" = "unpublish" ]; then
+          echo "Targeted invalidation for /docs/$DOC_CATEGORY/$DOC_SLUG"
+          aws cloudfront create-invalidation \
+            --distribution-id "$CLOUDFRONT_DISTRIBUTION_ID" \
+            --paths "/docs/$DOC_CATEGORY/$DOC_SLUG" \
+                    "/docs/$DOC_CATEGORY/$DOC_SLUG/*" \
+                    "/api/docs/nav" \
+                    "/index.html" \
+                    "/"
+        elif [ "$INVALIDATION_TYPE" = "new" ]; then
+          echo "New doc — invalidating nav + homepage only"
+          aws cloudfront create-invalidation \
+            --distribution-id "$CLOUDFRONT_DISTRIBUTION_ID" \
+            --paths "/api/docs/nav" \
+                    "/index.html" \
+                    "/"
+        else
+          echo "Full invalidation (CI/CD deploy or default)"
+          aws cloudfront create-invalidation \
+            --distribution-id "$CLOUDFRONT_DISTRIBUTION_ID" \
+            --paths "/*"
+        fi
+
+      - echo "=== Deploy complete ==="
+
+cache:
+  paths:
+    - 'node_modules/**/*'
