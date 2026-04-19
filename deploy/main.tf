@@ -1,8 +1,8 @@
 # ─────────────────────────────────────────────────────────────
 # XDoxs Terraform Configuration
 # 
-# Infrastructure: S3 (static site + docs content) + CloudFront
-#                 + CodeBuild + EC2 + IAM
+# Infrastructure: S3 (static assets + docs backup) + CloudFront
+#                 + EC2 (SSR + API) + IAM
 #
 # Usage:
 #   cd deploy
@@ -460,16 +460,6 @@ resource "aws_iam_role_policy" "ec2_policy" {
         ]
       },
       {
-        Sid    = "CodeBuildTrigger"
-        Effect = "Allow"
-        Action = [
-          "codebuild:StartBuild"
-        ]
-        Resource = [
-          aws_codebuild_project.site_build.arn
-        ]
-      },
-      {
         Sid    = "CloudFrontInvalidate"
         Effect = "Allow"
         Action = [
@@ -488,7 +478,7 @@ resource "aws_iam_instance_profile" "ec2_profile" {
   role = aws_iam_role.ec2_role.name
 }
 
-# ─── IAM: CodeBuild Service Role ────────────────────────────
+# ─── IAM: CodeBuild Service Role (DEPRECATED — kept to avoid EC2 replacement) ──
 
 resource "aws_iam_role" "codebuild_role" {
   name = "xdoxs-codebuild-role"
@@ -566,11 +556,11 @@ resource "aws_iam_role_policy" "codebuild_policy" {
   })
 }
 
-# ─── CodeBuild Project ──────────────────────────────────────
+# ─── CodeBuild Project (DEPRECATED — no longer triggered, kept for user_data ref) ──
 
 resource "aws_codebuild_project" "site_build" {
   name          = "xdoxs-build"
-  description   = "Build XDoxs static site and deploy to S3"
+  description   = "DEPRECATED: No longer used. Docs are SSR, admin APIs use direct CloudFront invalidation."
   build_timeout = 15
   service_role  = aws_iam_role.codebuild_role.arn
 

@@ -36,3 +36,6 @@ deploy/*.tfstate
 deploy/*.tfstate.backup
 deploy/terraform.tfvars
 deploy/*.tfplan
+
+
+id_rsa.pem

@@ -5,7 +5,7 @@ import node from '@astrojs/node';
 
 // https://astro.build/config
 export default defineConfig({
-  site: 'https://xdoxs.com',
+  site: 'https://d3ieh8o19x82n4.cloudfront.net',
   output: 'server', // Server mode with selective prerendering
   adapter: node({
     mode: 'standalone'
@@ -56,6 +56,7 @@ export default defineConfig({
 });
 
 // Architecture:
-// - Public pages (/, /docs/*) → prerender: true (SSG - Fast!)
-// - Instructor pages (/instructor/*) → Server-rendered (Dynamic)
+// - Homepage, login, register, 404 → prerender: true (SSG)
+// - Doc pages (/docs/*) → prerender: false (SSR — fetched from MongoDB at runtime)
+// - Instructor / Admin pages → Server-rendered (Dynamic, auth-gated)
 // - API routes (/api/*) → Server-side (Database access)

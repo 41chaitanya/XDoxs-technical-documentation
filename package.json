@@ -21,7 +21,6 @@
     "@astrojs/node": "^10.0.4",
     "@astrojs/sitemap": "^3.7.2",
     "@aws-sdk/client-cloudfront": "^3.1032.0",
-    "@aws-sdk/client-codebuild": "^3.1032.0",
     "@aws-sdk/client-s3": "^3.1032.0",
     "@aws-sdk/s3-request-presigner": "^3.1032.0",
     "astro": "^6.1.3",

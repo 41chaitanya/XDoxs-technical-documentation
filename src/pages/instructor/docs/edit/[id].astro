@@ -128,12 +128,22 @@ if (isBilingual) {
 
       <div class="sidebar-actions">
         <button class="btn-save" id="save-btn">Save</button>
-        {draft.status === 'draft' || draft.status === 'rejected' ? (
-          <button class="btn-submit" id="submit-btn">Submit for Review</button>
-        ) : draft.status === 'approved' ? (
-          <button class="btn-republish" id="republish-btn">Republish Changes</button>
+        {payload.role === 'super_admin' ? (
+          draft.status === 'approved' ? (
+            <span class="status-note published-note" id="status-badge">✓ Published</span>
+          ) : draft.publishedAt ? (
+            <button class="btn-republish" id="admin-publish-btn">Republish</button>
+          ) : (
+            <button class="btn-publish-direct" id="admin-publish-btn">Publish</button>
+          )
         ) : (
-          <span class="status-note">Status: {draft.status.replace('_', ' ')}</span>
+          draft.status === 'draft' || draft.status === 'rejected' ? (
+            <button class="btn-submit" id="submit-btn">Submit for Review</button>
+          ) : draft.status === 'approved' ? (
+            <button class="btn-republish" id="republish-btn">Republish Changes</button>
+          ) : (
+            <span class="status-note">Status: {draft.status.replace('_', ' ')}</span>
+          )
         )}
       </div>
     </aside>
@@ -449,7 +459,7 @@ if (isBilingual) {
       gap: 0.5rem;
     }
 
-    .btn-save, .btn-submit, .btn-republish {
+    .btn-save, .btn-submit, .btn-republish, .btn-publish-direct {
       padding: 0.65rem;
       border: none;
       border-radius: 6px;
@@ -492,6 +502,21 @@ if (isBilingual) {
       font-size: 0.8rem;
       color: var(--text-secondary);
       padding: 0.5rem;
+    }
+
+    .published-note {
+      color: oklch(0.5 0.15 120);
+      font-weight: 600;
+      font-size: 0.85rem;
+    }
+
+    .btn-publish-direct {
+      background: oklch(0.6 0.15 120);
+      color: white;
+    }
+
+    .btn-publish-direct:hover {
+      background: oklch(0.5 0.15 120);
     }
 
     /* CENTER EDITOR */
@@ -1120,7 +1145,7 @@ if (isBilingual) {
     }
   </style>
 
-  <script define:vars={{ draftId: String(draft._id), topics: topics.map(t => ({ id: t.id, title: t.title, content: t.content })), isBilingual, hiTopicContents }}>
+  <script define:vars={{ draftId: String(draft._id), topics: topics.map(t => ({ id: t.id, title: t.title, content: t.content })), isBilingual, hiTopicContents, wasPublished: !!draft.publishedAt, userRole: payload.role }}>
     let currentTopicId = topics[0]?.id;
     let currentView = 'edit';
     let currentLang = 'en'; // 'en' or 'hi'
@@ -1416,6 +1441,20 @@ if (isBilingual) {
       const data = await res.json();
       if (data.success) {
         btn.textContent = 'Saved';
+
+        // If doc was auto-unpublished (was approved, now draft), swap UI
+        if (data.wasUnpublished && userRole === 'super_admin') {
+          const badge = document.getElementById('status-badge');
+          if (badge) {
+            const republishBtn = document.createElement('button');
+            republishBtn.id = 'admin-publish-btn';
+            republishBtn.className = 'btn-republish';
+            republishBtn.textContent = 'Republish';
+            badge.replaceWith(republishBtn);
+            attachAdminPublish(republishBtn);
+          }
+        }
+
         setTimeout(() => { btn.textContent = 'Save'; btn.disabled = false; }, 1500);
       } else {
         await Dialog.alert('Error saving: ' + data.error, 'error');
@@ -1494,6 +1533,60 @@ if (isBilingual) {
         }
       });
     }
+
+    // ─── Admin Direct Publish / Republish ───────────────────
+    function attachAdminPublish(btnEl) {
+      btnEl.addEventListener('click', async () => {
+        const isRepublish = wasPublished;
+        const confirmMsg = isRepublish
+          ? 'Republish this document? CloudFront will be invalidated for this page.'
+          : 'Publish this document? It will appear on the public site.';
+
+        if (!await Dialog.confirm(confirmMsg, 'warn', isRepublish ? 'Republish' : 'Publish')) return;
+
+        btnEl.disabled = true;
+        btnEl.textContent = isRepublish ? 'Republishing...' : 'Publishing...';
+
+        // Save content first
+        const fullContent = topics.map(t => t.content).join('\n\n');
+        const description = document.getElementById('meta-desc').value;
+        const tags = document.getElementById('meta-tags').value.split(',').map(t => t.trim()).filter(Boolean);
+        const category = document.getElementById('meta-category').value;
+
+        const saveRes = await fetch('/api/docs/update', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ draftId, topics, content: fullContent, description, tags, category }),
+        });
+        const saveData = await saveRes.json();
+        if (!saveData.success) {
+          await Dialog.alert('Error saving: ' + saveData.error, 'error');
+          btnEl.disabled = false;
+          btnEl.textContent = isRepublish ? 'Republish' : 'Publish';
+          return;
+        }
+
+        // Publish directly via admin API
+        const res = await fetch('/api/admin/publish', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ draftId }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          await Dialog.alert(data.message || 'Published!', 'info');
+          window.location.reload();
+        } else {
+          await Dialog.alert('Error: ' + data.error, 'error');
+          btnEl.disabled = false;
+          btnEl.textContent = isRepublish ? 'Republish' : 'Publish';
+        }
+      });
+    }
+
+    // Attach to admin publish button if present on page load
+    const existingAdminBtn = document.getElementById('admin-publish-btn');
+    if (existingAdminBtn) attachAdminPublish(existingAdminBtn);
 
     // Delete topic
     async function deleteTopic(topicId) {

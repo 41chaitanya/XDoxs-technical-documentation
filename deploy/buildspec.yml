@@ -1,5 +1,12 @@
 # ─────────────────────────────────────────────────────────────
-# XDoxs CodeBuild Buildspec
+# ⚠️  DEPRECATED — This file is no longer used.
+#
+# Docs are now SSR (served from EC2 at runtime). Admin APIs
+# use direct CloudFront invalidation instead of CodeBuild.
+# Kept for reference only. Safe to delete.
+# ─────────────────────────────────────────────────────────────
+#
+# XDoxs CodeBuild Buildspec (DEPRECATED)
 #
 # Triggered by:
 #   1. Admin approve/publish/unpublish API → smart invalidation

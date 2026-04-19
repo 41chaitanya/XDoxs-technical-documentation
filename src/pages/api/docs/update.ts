@@ -132,9 +132,17 @@ export const PUT: APIRoute = async ({ request, cookies }) => {
       });
     }
     
+    // Auto-unpublish: editing content/topics of a published doc marks it as draft
+    const hasContentChange = updates.content !== undefined || updates.topics !== undefined;
+    const isStatusExplicit = updates.status !== undefined;
+    const wasUnpublished = draft.status === 'approved' && hasContentChange && !isStatusExplicit;
+    if (wasUnpublished) {
+      updates.status = 'draft';
+    }
+
     const updatedDraft = await updateDocDraft(draftId, updates);
     
-    return new Response(JSON.stringify({ success: true, draft: updatedDraft }), {
+    return new Response(JSON.stringify({ success: true, draft: updatedDraft, wasUnpublished }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
     });

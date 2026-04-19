@@ -3,7 +3,7 @@ import { verifyToken } from '../../../lib/auth/jwt';
 import { getDocDraft, updateDocDraft } from '../../../lib/db/docs';
 import { publishDocToStatic } from '../../../lib/docs/publisher';
 import { uploadMarkdown } from '../../../lib/aws/s3';
-import { triggerBuild } from '../../../lib/aws/codebuild';
+import { invalidateDocPath, invalidateNavOnly } from '../../../lib/aws/cloudfront';
 
 export const POST: APIRoute = async ({ request, cookies }) => {
   try {
@@ -61,18 +61,28 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       console.error('S3 sync failed (non-blocking):', s3Err);
     }
 
-    // 🚀 Trigger CodeBuild with smart invalidation
-    const invalidationType = isRepublish ? 'republish' : 'new';
-    const buildId = await triggerBuild(invalidationType, draft.category, draft.slug);
+    // Smart CloudFront invalidation — NO full /* invalidation
+    let invalidationId: string | null = null;
+    try {
+      if (isRepublish) {
+        // Edited doc: invalidate specific doc path + nav + homepage
+        invalidationId = await invalidateDocPath(draft.category, draft.slug);
+      } else {
+        // New doc: only invalidate nav + homepage (sidebar update)
+        invalidationId = await invalidateNavOnly();
+      }
+    } catch (cfErr) {
+      console.error('CloudFront invalidation failed (non-blocking):', cfErr);
+    }
     
     return new Response(
       JSON.stringify({ 
         success: true,
         isRepublish,
-        buildId,
-        message: buildId 
-          ? `Document approved and build triggered (${invalidationType})` 
-          : 'Document approved — manual rebuild required'
+        invalidationId,
+        message: isRepublish 
+          ? `Document approved & republished. CF invalidation for /docs/${draft.category}/${draft.slug}` 
+          : 'Document approved & published!'
       }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },

@@ -2,7 +2,7 @@ import type { APIRoute } from 'astro';
 import { verifyToken } from '../../../lib/auth/jwt';
 import { getDocDraft, updateDocDraft } from '../../../lib/db/docs';
 import { unpublishDoc } from '../../../lib/docs/publisher';
-import { triggerBuild } from '../../../lib/aws/codebuild';
+import { invalidateDocPath } from '../../../lib/aws/cloudfront';
 
 export const POST: APIRoute = async ({ request, cookies }) => {
   try {
@@ -44,10 +44,19 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     // Revert status back to draft in MongoDB
     await updateDocDraft(draftId, { status: 'draft' });
 
-    // Trigger rebuild to remove unpublished doc from static site + invalidate CloudFront
-    const buildId = await triggerBuild('unpublish', draft.category, draft.slug);
+    // Invalidate CloudFront for this specific doc path so it stops being served
+    let invalidationId: string | null = null;
+    try {
+      invalidationId = await invalidateDocPath(draft.category, draft.slug);
+    } catch (cfErr) {
+      console.error('CloudFront invalidation failed (non-blocking):', cfErr);
+    }
 
-    return new Response(JSON.stringify({ success: true, buildId }), {
+    return new Response(JSON.stringify({
+      success: true,
+      invalidationId,
+      message: `Document unpublished. CF invalidation for /docs/${draft.category}/${draft.slug}`
+    }), {
       status: 200, headers: { 'Content-Type': 'application/json' },
     });
   } catch (error) {

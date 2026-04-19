@@ -6,25 +6,9 @@ import { splitMarkdownIntoTopics, extractHeadingsFromTopic } from '../../lib/mar
 import { extractLangBlocks } from '../../lib/markdown/lang';
 import DocLayout from '../../layouts/DocLayout.astro';
 
-// ✅ STATIC GENERATION: Build time pe MongoDB se fetch, runtime pe NO DB calls
-export const prerender = true;
+// SSR: Fetch from MongoDB at runtime, CloudFront caches the response
+export const prerender = false;
 
-// Build time: Fetch all approved docs and generate static paths
-export async function getStaticPaths() {
-  const db = await getDb();
-  const approvedDocs = await db.collection(COLLECTIONS.DOC_DRAFTS)
-    .find({ status: 'approved' })
-    .toArray();
-
-  return approvedDocs.map((draft) => ({
-    params: { 
-      slug: `${draft.category}/${draft.slug}` 
-    },
-    props: { draft }
-  }));
-}
-
-const { draft } = Astro.props;
 const { slug } = Astro.params;
 const slugPath = Array.isArray(slug) ? slug.join('/') : (slug ?? '');
 
@@ -32,7 +16,17 @@ const parts = slugPath.split('/');
 const category = parts[0];
 const docSlug = parts[1];
 
-if (!category || !docSlug || !draft) return Astro.redirect('/');
+if (!category || !docSlug) return Astro.redirect('/404');
+
+// Fetch approved doc from MongoDB at request time
+const db = await getDb();
+const draft = await db.collection(COLLECTIONS.DOC_DRAFTS)
+  .findOne({ category, slug: docSlug, status: 'approved' }) as any;
+
+if (!draft) return Astro.redirect('/404');
+
+// CloudFront caches for 24h; we invalidate on republish
+Astro.response.headers.set('Cache-Control', 'public, s-maxage=86400, max-age=0, stale-while-revalidate=3600');
 
 const { en: enContent, hi: hiContent } = extractLangBlocks(String(draft.content || ''));
 

@@ -3,7 +3,7 @@ import { verifyToken } from '../../../lib/auth/jwt';
 import { getDocDraft } from '../../../lib/db/docs';
 import { publishDocToStatic } from '../../../lib/docs/publisher';
 import { uploadMarkdown } from '../../../lib/aws/s3';
-import { triggerBuild } from '../../../lib/aws/codebuild';
+import { invalidateDocPath, invalidateNavOnly } from '../../../lib/aws/cloudfront';
 
 export const POST: APIRoute = async ({ request, cookies }) => {
   try {
@@ -35,17 +35,41 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       });
     }
 
+    // Detect new publish vs republish
+    const isRepublish = !!draft.publishedAt;
+
+    // Pre-render HTML and save to MongoDB with approved status
     await publishDocToStatic(draft);
 
-    // Sync to S3 and trigger rebuild (always a republish since doc already exists)
+    // Upload markdown to S3
     try {
       await uploadMarkdown(draft.category, draft.slug, draft.content || '');
     } catch (s3Err) {
-      console.error('S3 sync failed (non-blocking):', s3Err);
+      console.error('S3 upload failed (non-blocking):', s3Err);
     }
-    const buildId = await triggerBuild('republish', draft.category, draft.slug);
 
-    return new Response(JSON.stringify({ success: true, buildId }), {
+    // Smart CloudFront invalidation — NO full /* invalidation
+    let invalidationId: string | null = null;
+    try {
+      if (isRepublish) {
+        // Edited doc: invalidate specific doc path + nav + homepage
+        invalidationId = await invalidateDocPath(draft.category, draft.slug);
+      } else {
+        // New doc: only invalidate nav + homepage (sidebar update)
+        invalidationId = await invalidateNavOnly();
+      }
+    } catch (cfErr) {
+      console.error('CloudFront invalidation failed (non-blocking):', cfErr);
+    }
+
+    return new Response(JSON.stringify({
+      success: true,
+      isRepublish,
+      invalidationId,
+      message: isRepublish
+        ? `Document republished. CF invalidation for /docs/${draft.category}/${draft.slug}`
+        : 'Document published successfully!'
+    }), {
       status: 200, headers: { 'Content-Type': 'application/json' },
     });
   } catch (error) {

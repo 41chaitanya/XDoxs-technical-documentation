@@ -19,9 +19,13 @@ export const onRequest = defineMiddleware(async (context, next) => {
   if (/\.(js|css|svg|png|jpg|jpeg|webp|avif|woff2?|ttf|eot|ico)$/i.test(pathname)) {
     newHeaders.set('Cache-Control', 'public, max-age=31536000, immutable');
   }
-  // HTML pages: revalidate
+  // HTML pages: respect explicit s-maxage set by SSR pages (e.g., docs),
+  // otherwise default to browser-revalidate
   else if (response.headers.get('content-type')?.includes('text/html')) {
-    newHeaders.set('Cache-Control', 'public, max-age=0, must-revalidate');
+    const existing = response.headers.get('Cache-Control') || '';
+    if (!existing.includes('s-maxage')) {
+      newHeaders.set('Cache-Control', 'public, max-age=0, must-revalidate');
+    }
   }
   // API routes: no cache (use private + no-cache instead of no-store to allow bfcache)
   else if (pathname.startsWith('/api/')) {
