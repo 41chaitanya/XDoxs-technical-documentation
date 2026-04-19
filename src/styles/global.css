@@ -1,10 +1,10 @@
 /* Modern CSS with OKLCH Color System */
 :root {
   /* Primary Brand Color - Teal/Cyan */
-  --primary: oklch(0.6122 0.1332 165.37);
-  --primary-hover: oklch(0.5522 0.1432 165.37);
-  --primary-light: oklch(0.9 0.05 165.37);
-  --primary-dark: oklch(0.4 0.15 165.37);
+  --primary: #004D36;
+  --primary-hover: #003D2B;
+  --primary-light: #E6F5F0;
+  --primary-dark: #00261A;
   
   /* Neutral Colors */
   --bg-primary: oklch(1 0 0);
@@ -12,8 +12,8 @@
   --bg-tertiary: oklch(0.96 0 0);
   
   --text-primary: oklch(0.2 0 0);
-  --text-secondary: oklch(0.5 0 0);
-  --text-tertiary: oklch(0.65 0 0);
+  --text-secondary: oklch(0.4 0 0);
+  --text-tertiary: oklch(0.52 0 0);
   
   --border: oklch(0.9 0 0);
   --border-hover: oklch(0.85 0 0);
@@ -35,23 +35,26 @@
   --radius-sm: 6px;
   --radius-lg: 14px;
   --container: 1200px;
+
+  /* Prevent CLS on scrollbar appearance */
+  scrollbar-gutter: stable;
 }
 
 /* Dark Mode */
 @media (prefers-color-scheme: dark) {
   :root {
-    --primary: oklch(0.7 0.14 165.37);
-    --primary-hover: oklch(0.75 0.15 165.37);
-    --primary-light: oklch(0.3 0.08 165.37);
-    --primary-dark: oklch(0.8 0.16 165.37);
+    --primary: #5AC8A5;
+    --primary-hover: #6FD4B2;
+    --primary-light: #1A3D30;
+    --primary-dark: #A0E6C8;
     
     --bg-primary: oklch(0.15 0 0);
     --bg-secondary: oklch(0.18 0 0);
     --bg-tertiary: oklch(0.22 0 0);
     
     --text-primary: oklch(0.95 0 0);
-    --text-secondary: oklch(0.7 0 0);
-    --text-tertiary: oklch(0.55 0 0);
+    --text-secondary: oklch(0.78 0 0);
+    --text-tertiary: oklch(0.65 0 0);
     
     --border: oklch(0.25 0 0);
     --border-hover: oklch(0.3 0 0);
@@ -59,10 +62,30 @@
 }
 
 /* Reset */
-* {
+*,
+*::before,
+*::after {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+}
+
+html {
+  /* Smooth scrolling only when user hasn't opted for reduced motion */
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 body {
@@ -72,6 +95,10 @@ body {
   background: var(--bg-secondary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeSpeed;
+  min-height: 100vh;
+  /* Ensure text doesn't shift during font swap */
+  font-display: optional;
 }
 
 /* Container */
@@ -87,6 +114,8 @@ h1, h2, h3, h4, h5, h6 {
   line-height: 1.2;
   margin-bottom: 1rem;
   color: var(--text-primary);
+  /* Prevent CLS from heading font weight shifts */
+  font-synthesis: none;
 }
 
 h1 { font-size: 2.5rem; }
@@ -102,7 +131,7 @@ p {
 a {
   color: var(--primary);
   text-decoration: none;
-  transition: color 0.2s ease;
+  transition: color 0.15s ease;
 }
 
 a:hover {
@@ -112,7 +141,7 @@ a:hover {
 /* Code */
 code {
   background: var(--bg-tertiary);
-  color: var(--primary);
+  color: var(--primary-dark);
   padding: 0.2rem 0.5rem;
   border-radius: var(--radius-sm);
   font-size: 0.9em;
@@ -207,7 +236,7 @@ th {
   outline-offset: 2px;
 }
 
-/* Animations */
+/* Animations — use composited properties only (transform, opacity) */
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -256,13 +285,54 @@ th {
 }
 
 .glass {
-  background: oklch(1 0 0 / 0.7);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  background: oklch(1 0 0 / 0.85);
 }
 
 @media (prefers-color-scheme: dark) {
   .glass {
-    background: oklch(0.15 0 0 / 0.7);
+    background: oklch(0.15 0 0 / 0.85);
+  }
+}
+
+/* Images — prevent CLS */
+img, video {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  content-visibility: auto;
+}
+
+svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+/* Skip to content — Accessibility */
+.skip-to-content {
+  position: absolute;
+  top: -100%;
+  left: 0;
+  z-index: 9999;
+  padding: 0.75rem 1.5rem;
+  background: var(--primary);
+  color: white;
+  font-weight: 600;
+  border-radius: 0 0 var(--radius) 0;
+  transition: top 0.2s;
+}
+
+.skip-to-content:focus {
+  top: 0;
+}
+
+/* Print styles */
+@media print {
+  body {
+    background: white;
+    color: black;
+  }
+  .header, .topics-sidebar, .footer, .skip-to-content {
+    display: none !important;
   }
 }

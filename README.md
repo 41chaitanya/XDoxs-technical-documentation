@@ -1,136 +1,156 @@
-# XDoxs - Production-Level Documentation Platform
+# XDoxs — Local Dev Setup
 
-Fast, SEO-optimized documentation platform built with Astro.
+A documentation platform built with Astro, MongoDB, and JWT auth. Instructors upload docs, admins review and publish them.
 
-## 🚀 Features
+---
 
-- ⚡ Lightning fast static site generation
-- 🎯 SEO optimized (meta tags, sitemap, structured data)
-- 📱 Fully responsive design
-- 🎨 Beautiful UI with TailwindCSS
-- 📝 Markdown/MDX support
-- 🔍 Category-based organization
-- 🏷️ Tag system
-- 🌐 Open source
+## Prerequisites
 
-## 🛠️ Tech Stack
+- Node.js `>= 22.12.0`
+- MongoDB running locally (or a MongoDB Atlas URI)
 
-- **Astro** - Static site generator
-- **TailwindCSS** - Styling
-- **MDX** - Enhanced markdown
-- **TypeScript** - Type safety
+---
 
-## 📦 Installation
+## 1. Clone & Install
 
 ```bash
-# Install dependencies
+git clone <repo-url>
+cd xdoxs
 npm install
+```
 
-# Run development server
+---
+
+## 2. Environment Variables
+
+Copy the example env file and fill in your values:
+
+```bash
+cp .env.example .env
+```
+
+`.env` values:
+
+```env
+# Local MongoDB (default)
+MONGODB_URI=mongodb://localhost:27017/xdoxs
+
+# Or MongoDB Atlas
+# MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/xdoxs
+
+# JWT secret — change this to anything for local dev
+JWT_SECRET=your-local-dev-secret
+
+# Gemini API Key (Optional - for AI documentation generation)
+# Get free API key from https://makersuite.google.com/app/apikey
+GEMINI_API_KEY=your-gemini-api-key-here
+```
+
+> **Note**: The Gemini API key is optional. If not configured, the AI generation feature will show an error message with setup instructions.
+
+---
+
+## 3. Seed Test Users
+
+Run the seed script to create the default test accounts:
+
+```bash
+npm run seed
+```
+
+This creates three users (all with password `ramram`):
+
+| Role        | Email                    | Password |
+|-------------|--------------------------|----------|
+| Super Admin | admin@xdoxs.com          | ramram   |
+| Instructor  | instructor@xdoxs.com     | ramram   |
+| Student     | student@xdoxs.com        | ramram   |
+
+> Safe to run multiple times — skips existing users.
+
+---
+
+## 4. Start Dev Server
+
+```bash
 npm run dev
-
-# Build for production
-npm run build
-
-# Preview production build
-npm run preview
 ```
 
-## 📁 Project Structure
-
-```
-xdoxs/
-├── src/
-│   ├── content/
-│   │   ├── config.ts          # Content collection schema
-│   │   └── docs/              # Documentation files
-│   │       ├── javascript/
-│   │       ├── devops/
-│   │       └── python/
-│   ├── layouts/
-│   │   ├── BaseLayout.astro   # Base HTML layout
-│   │   └── DocLayout.astro    # Documentation page layout
-│   ├── components/
-│   │   ├── Header.astro       # Site header
-│   │   └── Sidebar.astro      # Documentation sidebar
-│   ├── pages/
-│   │   ├── index.astro        # Homepage
-│   │   └── docs/
-│   │       └── [...slug].astro # Dynamic doc pages
-│   └── styles/
-│       └── global.css         # Global styles
-├── public/
-│   ├── favicon.svg
-│   └── robots.txt
-└── astro.config.mjs           # Astro configuration
-```
-
-## 📝 Adding Documentation
-
-Create a new `.md` file in `src/content/docs/`:
-
-```markdown
----
-title: "Your Doc Title"
-description: "Brief description"
-category: "javascript"
-tags: ["tag1", "tag2"]
-author: "Your Name"
-date: 2026-04-04
-featured: true
----
-
-# Your Content Here
-
-Write your documentation...
-```
-
-## 🎨 Customization
-
-- Edit `tailwind.config.mjs` for theme customization
-- Modify `src/styles/global.css` for global styles
-- Update `astro.config.mjs` for site configuration
-
-## 🚀 Deployment
-
-### Cloudflare Pages
-
-```bash
-npm run build
-# Upload dist/ folder to Cloudflare Pages
-```
-
-### Vercel
-
-```bash
-vercel deploy
-```
-
-### Netlify
-
-```bash
-netlify deploy --prod
-```
-
-## 📊 Performance
-
-- Lighthouse Score: 95+
-- First Contentful Paint: <1s
-- Time to Interactive: <1s
-
-## 🤝 Contributing
-
-Contributions welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) first.
-
-## 📄 License
-
-MIT License - see [LICENSE](LICENSE) file for details.
-
-## 🔗 Links
-
-- [Documentation](https://xdoxs.com/docs)
-- [GitHub](https://github.com/yourusername/xdoxs)
+App runs at `http://localhost:4321`
 
 ---
 
-Built with ❤️ using Astro
+## 5. Key Routes
+
+| URL | Description |
+|-----|-------------|
+| `/` | Landing page |
+| `/login` | Login |
+| `/register` | Register |
+| `/instructor/dashboard` | Instructor view (requires instructor role) |
+| `/instructor/docs/upload` | Upload or add a doc topic |
+| `/instructor/docs/ai-generate` | 🤖 AI-powered documentation generation |
+| `/admin/dashboard` | Admin review queue (requires super_admin role) |
+| `/docs/[category]/[slug]` | Published public docs |
+
+---
+
+## 6. 🤖 AI Documentation Generation (New!)
+
+XDoxs now includes an AI-powered documentation generator using Google's Gemini API.
+
+### Features:
+- Interactive chat interface to describe what you want
+- Real-time markdown preview
+- Bilingual support (English + Hinglish)
+- Create new docs or append to existing ones
+- Free to use with Gemini API
+
+### Setup:
+1. Get a free API key from [Google AI Studio](https://makersuite.google.com/app/apikey)
+2. Add it to your `.env` file as `GEMINI_API_KEY`
+3. Access via "🤖 Generate with AI" button on instructor dashboard
+
+📖 **Full Guide**: See [AI-GENERATION-GUIDE.md](./AI-GENERATION-GUIDE.md) for detailed instructions and examples.
+
+---
+
+## 7. Workflow Overview
+
+1. **Instructor** logs in → uploads a `.md` file, adds a topic, or generates with AI 🤖
+2. Instructor submits doc for review
+3. **Admin** logs in → reviews, approves or rejects
+4. On approval, doc is published to `src/content/docs/[category]/[slug]/`
+5. **Restart the dev server** after approving docs to see them appear on the public site
+
+---
+
+## 8. Available Scripts
+
+```bash
+npm run dev       # Start dev server
+npm run build     # Production build
+npm run preview   # Preview production build
+npm run seed      # Seed test users into MongoDB
+```
+
+---
+
+## Troubleshooting
+
+### `tsx: command not found`
+
+`tsx` is missing. Install it first, then re-run the seed:
+
+```bash
+npm install -D tsx
+npm run seed
+```
+
+
+
+
+
+
+
+

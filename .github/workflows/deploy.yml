@@ -1,0 +1,171 @@
+# ─────────────────────────────────────────────────────────────
+# XDoxs CI/CD Pipeline
+#
+# Trigger : push to main
+# Strategy: Single build -> deploy client to S3, server to EC2
+#
+# Required GitHub Secrets:
+#   AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION
+#   S3_STATIC_BUCKET, S3_DOCS_BUCKET
+#   CLOUDFRONT_DISTRIBUTION_ID
+#   MONGODB_URI, JWT_SECRET
+#   EC2_HOST, EC2_USER, EC2_SSH_KEY
+# ─────────────────────────────────────────────────────────────
+
+name: Deploy XDoxs
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: # allow manual trigger
+
+env:
+  NODE_VERSION: '22'
+
+jobs:
+  build-and-deploy:
+    name: Build & Deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      # ── Checkout & Setup ───────────────────────────────────
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # ── Build (single build for both client & server) ──────
+      - name: Build Astro site
+        run: npm run build
+        env:
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          S3_DOCS_BUCKET: ${{ secrets.S3_DOCS_BUCKET }}
+          CLOUDFRONT_DISTRIBUTION_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
+
+      - name: Show build output
+        run: |
+          echo "=== dist/client ==="
+          ls -lhR dist/client/ | head -40
+          echo ""
+          echo "=== dist/server ==="
+          ls -lhR dist/server/ | head -20
+
+      # ── Deploy Client (dist/client -> S3) ──────────────────
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Deploy client to S3
+        run: |
+          # Sync all static files with 1-day cache
+          aws s3 sync dist/client/ s3://${{ secrets.S3_STATIC_BUCKET }}/ \
+            --delete \
+            --cache-control "public, max-age=86400"
+
+          # Override hashed assets with immutable cache (1 year) if they exist
+          if [ -d "dist/client/_astro" ]; then
+            aws s3 sync dist/client/_astro/ s3://${{ secrets.S3_STATIC_BUCKET }}/_astro/ \
+              --cache-control "public, max-age=31536000, immutable"
+            echo "Hashed assets synced with immutable cache"
+          else
+            echo "No _astro/ directory found, skipping immutable cache override"
+          fi
+
+          echo "Client deployed to S3: ${{ secrets.S3_STATIC_BUCKET }}"
+
+      # ── Deploy Server (dist/server + config -> EC2) ────────
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Deploy server to EC2
+        run: |
+          SSH="ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no"
+          SCP="scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no"
+          EC2="${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}"
+          REMOTE="/opt/xdoxs"
+
+          # Package server files (dist/ + runtime config)
+          mkdir -p deploy-package
+          cp -r dist/ deploy-package/
+          cp package.json package-lock.json start.mjs ecosystem.config.cjs deploy-package/
+
+          # Sync to EC2 (preserves .env on remote)
+          rsync -avz --delete \
+            --exclude '.env' \
+            --exclude 'node_modules' \
+            --exclude 'logs' \
+            -e "$SSH" \
+            deploy-package/ \
+            "$EC2:$REMOTE/"
+
+          # Install deps & restart PM2 on EC2
+          $SSH "$EC2" << 'EOF'
+          set -e
+          cd /opt/xdoxs
+
+          # Load environment
+          set -a && source .env && set +a
+
+          # Install production dependencies only
+          npm ci --omit=dev
+
+          # Reload or start PM2
+          if pm2 describe xdoxs > /dev/null 2>&1; then
+            pm2 reload ecosystem.config.cjs --update-env
+          else
+            pm2 start ecosystem.config.cjs
+          fi
+          pm2 save
+
+          echo "Server deployed and running:"
+          pm2 list
+          EOF
+
+      - name: Cleanup SSH key
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
+
+      # ── Invalidate CloudFront ──────────────────────────────
+      - name: Invalidate CloudFront cache
+        run: |
+          INVALIDATION_ID=$(aws cloudfront create-invalidation \
+            --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} \
+            --paths "/*" \
+            --query 'Invalidation.Id' \
+            --output text)
+          echo "CloudFront invalidation created: $INVALIDATION_ID"
+
+      # ── Smoke Test ─────────────────────────────────────────
+      - name: Verify deployment
+        run: |
+          echo "Waiting 15s for services to stabilize..."
+          sleep 15
+
+          # Test EC2 directly
+          EC2_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            --max-time 10 \
+            "http://${{ secrets.EC2_HOST }}:4322/" || echo "000")
+          echo "EC2 direct: HTTP $EC2_STATUS"
+
+          if [ "$EC2_STATUS" != "200" ]; then
+            echo "WARNING: EC2 returned $EC2_STATUS (may need more time to start)"
+          fi
+
+          echo "Deployment complete!"

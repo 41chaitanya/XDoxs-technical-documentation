@@ -1,29 +1,73 @@
 ---
-import { getCollection, render } from 'astro:content';
+import { getDb } from '../../lib/db/mongodb';
+import { COLLECTIONS } from '../../lib/db/models';
+import { renderMarkdown } from '../../lib/markdown/render';
+import { splitMarkdownIntoTopics, extractHeadingsFromTopic } from '../../lib/markdown/splitter';
+import { extractLangBlocks } from '../../lib/markdown/lang';
 import DocLayout from '../../layouts/DocLayout.astro';
 
+// ✅ STATIC GENERATION: Build time pe MongoDB se fetch, runtime pe NO DB calls
+export const prerender = true;
+
+// Build time: Fetch all approved docs and generate static paths
 export async function getStaticPaths() {
-  const docs = await getCollection('docs');
-  
-  return docs.map(doc => ({
-    params: { slug: doc.id },
-    props: { doc },
+  const db = await getDb();
+  const approvedDocs = await db.collection(COLLECTIONS.DOC_DRAFTS)
+    .find({ status: 'approved' })
+    .toArray();
+
+  return approvedDocs.map((draft) => ({
+    params: { 
+      slug: `${draft.category}/${draft.slug}` 
+    },
+    props: { draft }
   }));
 }
 
-const { doc } = Astro.props;
-const { Content, headings } = await render(doc);
+const { draft } = Astro.props;
+const { slug } = Astro.params;
+const slugPath = Array.isArray(slug) ? slug.join('/') : (slug ?? '');
+
+const parts = slugPath.split('/');
+const category = parts[0];
+const docSlug = parts[1];
+
+if (!category || !docSlug || !draft) return Astro.redirect('/');
+
+const { en: enContent, hi: hiContent } = extractLangBlocks(String(draft.content || ''));
+
+const htmlContent = String(draft.renderedHtml || '') || await renderMarkdown(enContent);
+const htmlContentHi = String(draft.renderedHtmlHi || '');
+const hasHinglish = !!htmlContentHi;
+
+// Extract headings for sidebar/TOC - for both languages
+const topicsEn = splitMarkdownIntoTopics(enContent);
+const headingsEn = topicsEn.flatMap(t => extractHeadingsFromTopic(t.content));
+const h2TopicsEn = headingsEn.filter(h => h.depth === 2);
+
+let h2TopicsHi: Array<{ slug: string; text: string }> = [];
+if (hasHinglish && hiContent) {
+  const topicsHi = splitMarkdownIntoTopics(hiContent);
+  const headingsHi = topicsHi.flatMap(t => extractHeadingsFromTopic(t.content));
+  h2TopicsHi = headingsHi.filter(h => h.depth === 2);
+}
+
+const publishedAt = draft.publishedAt ? new Date(draft.publishedAt) : new Date(draft.updatedAt);
 ---
 
 <DocLayout
-  title={doc.data.title}
-  description={doc.data.description}
-  date={doc.data.date}
-  author={doc.data.author}
-  category={doc.data.category}
-  tags={doc.data.tags}
-  headings={headings}
-  docId={doc.id}
+  title={draft.title}
+  description={draft.description || ''}
+  date={publishedAt}
+  author={draft.instructorEmail}
+  category={draft.category}
+  tags={draft.tags || []}
+  headings={headingsEn}
+  docId={slugPath}
+  topicsEn={h2TopicsEn}
+  topicsHi={h2TopicsHi}
+  hasHinglish={hasHinglish}
 >
-  <Content />
+  <div class="doc-content-en" set:html={htmlContent} />
+  {hasHinglish && <div class="doc-content-hi" set:html={htmlContentHi} style="display:none" />}
 </DocLayout>

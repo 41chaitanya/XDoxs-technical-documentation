@@ -66,7 +66,7 @@ export const POST: APIRoute = async ({ request }) => {
         status: 201,
         headers: {
           'Content-Type': 'application/json',
-          'Set-Cookie': `auth_token=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=604800`, // 7 days
+          'Set-Cookie': `auth_token=${token}; Path=/; HttpOnly; SameSite=Lax;${import.meta.env.PROD ? ' Secure;' : ''} Max-Age=604800`,
         },
       }
     );

@@ -1,0 +1,40 @@
+---
+import { verifyToken } from '../lib/auth/jwt';
+
+const token = Astro.cookies.get('auth_token')?.value;
+
+let user = null;
+if (token) {
+  user = verifyToken(token);
+}
+
+const hasCookie = !!token;
+---
+
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Auth Test</title>
+</head>
+<body style="font-family: monospace; padding: 2rem;">
+  <h1>Auth Test Page</h1>
+  
+  <h2>Server-side Check:</h2>
+  <pre>Token: {hasCookie ? 'EXISTS' : 'NOT FOUND'}</pre>
+  <pre>User: {user ? JSON.stringify(user, null, 2) : 'NOT LOGGED IN'}</pre>
+  
+  <h2>Client-side Check:</h2>
+  <pre id="client-cookies">Loading...</pre>
+  
+  <hr />
+  <a href="/">Go to Homepage</a> | 
+  <a href="/login">Go to Login</a>
+  
+  <script>
+    const el = document.getElementById('client-cookies');
+    if (el) {
+      el.textContent = 'document.cookie: ' + (document.cookie || 'EMPTY');
+    }
+  </script>
+</body>
+</html>

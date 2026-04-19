@@ -1,0 +1,34 @@
+# ─── Example terraform.tfvars ────────────────────────────────
+# Copy this file to terraform.tfvars and fill in the values.
+# DO NOT commit terraform.tfvars to version control.
+#
+# Usage:
+#   cp terraform.tfvars.example terraform.tfvars
+#   # Edit terraform.tfvars with your values
+#   terraform plan
+#   terraform apply
+# ─────────────────────────────────────────────────────────────
+
+aws_region   = "ap-south-2"
+environment  = "prod"
+
+# S3 bucket names (must be globally unique)
+static_site_bucket_name  = "xdoxs-static-site-YOURNAME"
+docs_content_bucket_name = "xdoxs-docs-content-YOURNAME"
+
+# CloudFront
+cloudfront_price_class = "PriceClass_200"  # US, Canada, Europe, Asia
+
+# EC2
+ec2_ami           = "ami-00af3ed8e1f001a3f"  # Amazon Linux 2023 in ap-south-2 (Hyderabad)
+ec2_instance_type = "t3.small"
+ec2_key_name      = "your-key-pair-name"
+ec2_port          = 4322
+ssh_allowed_cidrs = ["YOUR_IP/32"]  # e.g. ["203.0.113.50/32"]
+
+# Application secrets
+mongodb_uri = "mongodb+srv://user:pass@cluster.mongodb.net/xdoxs"
+jwt_secret  = "your-strong-random-secret-here"
+
+# GitHub
+github_repo_url = "https://github.com/YOUR_USERNAME/XDoxs-technical-documentation.git"

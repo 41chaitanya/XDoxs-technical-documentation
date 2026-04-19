@@ -1,57 +1,122 @@
 ---
-import { getCollection } from 'astro:content';
-
-const allDocs = await getCollection('docs');
-
-// Group docs by category
-const docsByCategory = allDocs.reduce((acc, doc) => {
-  const category = doc.data.category;
-  if (!acc[category]) {
-    acc[category] = [];
-  }
-  acc[category].push(doc);
-  return acc;
-}, {} as Record<string, typeof allDocs>);
-
-const categories = Object.keys(docsByCategory).sort();
+// ✅ NO SERVER-SIDE DATA FETCHING - All data loaded client-side for static pages
 ---
 
-<header class="header">
+<a href="#main-content" class="skip-to-content">Skip to content</a>
+<header class="header" role="banner">
   <div class="container">
-    <nav class="nav">
-      <a href="/" class="logo">XDoxs</a>
+    <nav class="nav" aria-label="Main navigation">
+      <a href="/" class="logo" aria-label="XDoxs - Home">XDoxs</a>
       
       <div class="nav-links">
         <!-- Docs Dropdown -->
         <div class="dropdown">
-          <a href="#" class="dropdown-trigger">
+          <button class="dropdown-trigger" aria-expanded="false" aria-haspopup="true" aria-label="Documentation menu">
             Docs
-            <svg class="dropdown-arrow" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg class="dropdown-arrow" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <polyline points="6 9 12 15 18 9"></polyline>
             </svg>
-          </a>
+          </button>
           
           <div class="dropdown-menu">
-            <div class="dropdown-content">
-              {categories.map(category => (
-                <div class="dropdown-section">
-                  <div class="dropdown-category">{category}</div>
-                  <div class="dropdown-items">
-                    {docsByCategory[category].map(doc => (
-                      <a href={`/docs/${doc.id}`} class="dropdown-item">
-                        {doc.data.title}
-                      </a>
-                    ))}
-                  </div>
-                </div>
-              ))}
+            <div class="dropdown-content" id="docs-nav-content">
+              <div class="dropdown-loading">Loading...</div>
             </div>
           </div>
         </div>
         
-        <a href="https://github.com/yourusername/xdoxs" target="_blank">GitHub</a>
+        <a href="https://github.com/yourusername/xdoxs" target="_blank" rel="noopener noreferrer" aria-label="GitHub (opens in new tab)">GitHub</a>
+        
+        <!-- Theme Selector (Sun Icon) -->
+        <div class="theme-selector">
+          <button class="theme-btn" aria-label="Change theme color" aria-expanded="false" aria-haspopup="true">
+            <svg class="theme-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="5"></circle>
+              <line x1="12" y1="1" x2="12" y2="3"></line>
+              <line x1="12" y1="21" x2="12" y2="23"></line>
+              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+              <line x1="1" y1="12" x2="3" y2="12"></line>
+              <line x1="21" y1="12" x2="23" y2="12"></line>
+              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+              <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+            </svg>
+          </button>
+          
+          <div class="theme-dropdown">
+            <div class="theme-options">
+              <button class="theme-option" data-hue="165.37" title="Teal" aria-label="Teal theme">
+                <span class="theme-circle" style="background: oklch(0.50 0.13 165.37)"></span>
+              </button>
+              <button class="theme-option" data-hue="0" title="Gray" aria-label="Gray theme">
+                <span class="theme-circle" style="background: oklch(0.50 0.13 0)"></span>
+              </button>
+              <button class="theme-option" data-hue="31.08" title="Orange" aria-label="Orange theme">
+                <span class="theme-circle" style="background: oklch(0.50 0.13 31.08)"></span>
+              </button>
+              <button class="theme-option" data-hue="71.47" title="Yellow" aria-label="Yellow theme">
+                <span class="theme-circle" style="background: oklch(0.50 0.13 71.47)"></span>
+              </button>
+              <button class="theme-option" data-hue="120" title="Green" aria-label="Green theme">
+                <span class="theme-circle" style="background: oklch(0.50 0.13 120)"></span>
+              </button>
+              <button class="theme-option" data-hue="240" title="Blue" aria-label="Blue theme">
+                <span class="theme-circle" style="background: oklch(0.50 0.13 240)"></span>
+              </button>
+              <button class="theme-option" data-hue="280" title="Purple" aria-label="Purple theme">
+                <span class="theme-circle" style="background: oklch(0.50 0.13 280)"></span>
+              </button>
+              <button class="theme-option" data-hue="330" title="Pink" aria-label="Pink theme">
+                <span class="theme-circle" style="background: oklch(0.50 0.13 330)"></span>
+              </button>
+            </div>
+          </div>
+        </div>
+        
+        <div class="auth-slot">
+          <div class="user-profile">
+            <button class="profile-btn" aria-label="User profile">
+              <div class="profile-avatar">U</div>
+            </button>
+          
+          <div class="profile-dropdown">
+            <div class="profile-info">
+              <div class="profile-name"></div>
+              <div class="profile-role"></div>
+            </div>
+            <div class="profile-divider"></div>
+            <div class="profile-links">
+              <a href="/instructor/dashboard" class="profile-link dashboard-link" style="display: none;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <rect x="3" y="3" width="7" height="7"></rect>
+                  <rect x="14" y="3" width="7" height="7"></rect>
+                  <rect x="14" y="14" width="7" height="7"></rect>
+                  <rect x="3" y="14" width="7" height="7"></rect>
+                </svg>
+                Instructor Dashboard
+              </a>
+              <a href="/admin/dashboard" class="profile-link admin-link" style="display: none;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                  <path d="M2 17l10 5 10-5"></path>
+                  <path d="M2 12l10 5 10-5"></path>
+                </svg>
+                Admin Dashboard
+              </a>
+              <button class="profile-link logout-btn" id="logout-btn">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                  <polyline points="16 17 21 12 16 7"></polyline>
+                  <line x1="21" y1="12" x2="9" y2="12"></line>
+                </svg>
+                Logout
+              </button>
+            </div>
+          </div>
+        </div>
         
         <a href="/login" class="login-btn">Login</a>
+        </div>
       </div>
     </nav>
   </div>
@@ -59,18 +124,19 @@ const categories = Object.keys(docsByCategory).sort();
 
 <style>
   .header {
-    background: oklch(1 0 0 / 0.8);
+    background: oklch(1 0 0);
     border-bottom: 1px solid var(--border);
     position: sticky;
     top: 0;
     z-index: 100;
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    /* Explicit height prevents CLS from header layout shifts */
+    height: 65px;
+    contain: layout style;
   }
 
   @media (prefers-color-scheme: dark) {
     .header {
-      background: oklch(0.15 0 0 / 0.8);
+      background: oklch(0.15 0 0);
     }
   }
 
@@ -94,12 +160,14 @@ const categories = Object.keys(docsByCategory).sort();
     display: flex;
     gap: 2rem;
     align-items: center;
+    /* Prevent CLS when auth state swaps login-btn <-> user-profile */
+    contain: layout style;
   }
 
   .nav-links > a {
     color: var(--text-primary);
     font-weight: 500;
-    transition: all 0.2s ease;
+    transition: color 0.15s ease;
     position: relative;
   }
 
@@ -129,7 +197,7 @@ const categories = Object.keys(docsByCategory).sort();
     padding: 0.5rem 1.25rem;
     border-radius: var(--radius-sm);
     font-weight: 600;
-    transition: all 0.2s ease;
+    transition: background 0.15s ease, box-shadow 0.15s ease;
   }
 
   .login-btn::after {
@@ -138,7 +206,6 @@ const categories = Object.keys(docsByCategory).sort();
 
   .login-btn:hover {
     background: var(--primary-hover);
-    transform: translateY(-1px);
     box-shadow: 0 4px 8px oklch(0 0 0 / 0.15);
   }
 
@@ -153,8 +220,14 @@ const categories = Object.keys(docsByCategory).sort();
     display: flex;
     align-items: center;
     gap: 0.25rem;
-    transition: all 0.2s ease;
+    transition: color 0.15s ease;
     position: relative;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: inherit;
+    font-family: inherit;
+    padding: 0;
   }
 
   .dropdown-trigger::after {
@@ -195,7 +268,7 @@ const categories = Object.keys(docsByCategory).sort();
     box-shadow: var(--shadow-lg);
     opacity: 0;
     visibility: hidden;
-    transition: all 0.2s ease;
+    transition: opacity 0.15s ease, visibility 0.15s ease;
     min-width: 500px;
     max-height: 70vh;
     overflow-y: auto;
@@ -217,6 +290,13 @@ const categories = Object.keys(docsByCategory).sort();
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
     gap: 1.5rem;
+  }
+
+  .dropdown-loading {
+    padding: 2rem;
+    text-align: center;
+    color: var(--text-secondary);
+    grid-column: 1 / -1;
   }
 
   .dropdown-section {
@@ -244,7 +324,7 @@ const categories = Object.keys(docsByCategory).sort();
     color: var(--text-primary);
     font-size: 0.9rem;
     border-radius: var(--radius-sm);
-    transition: all 0.2s ease;
+    transition: background 0.15s ease, color 0.15s ease;
     display: block;
     white-space: nowrap;
     overflow: hidden;
@@ -254,7 +334,238 @@ const categories = Object.keys(docsByCategory).sort();
   .dropdown-item:hover {
     background: var(--primary-light);
     color: var(--primary);
-    transform: translateX(4px);
+  }
+
+  /* Theme Selector */
+  .theme-selector {
+    position: relative;
+  }
+
+  .theme-btn {
+    background: none;
+    border: none;
+    color: var(--text-primary);
+    cursor: pointer;
+    padding: 0.5rem;
+    border-radius: var(--radius-sm);
+    transition: background 0.15s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .theme-btn:hover {
+    background: var(--bg-secondary);
+  }
+
+  .theme-icon {
+    transition: transform 0.2s ease;
+    stroke: var(--primary);
+  }
+
+  .theme-btn:hover .theme-icon {
+    transform: rotate(45deg);
+  }
+
+  .theme-dropdown {
+    position: absolute;
+    top: calc(100% + 0.5rem);
+    right: 0;
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-lg);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.15s ease, visibility 0.15s ease;
+    padding: 0.75rem;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .theme-dropdown {
+      background: var(--bg-secondary);
+    }
+  }
+
+  .theme-selector:hover .theme-dropdown {
+    opacity: 1;
+    visibility: visible;
+  }
+
+  .theme-options {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.5rem;
+  }
+
+  .theme-option {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0.25rem;
+    border-radius: 50%;
+    transition: transform 0.15s ease;
+  }
+
+  .theme-option:hover {
+    transform: scale(1.1);
+  }
+
+  .theme-circle {
+    display: block;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  .theme-option:hover .theme-circle {
+    border-color: var(--text-primary);
+    box-shadow: 0 0 0 2px var(--bg-primary), 0 0 0 4px var(--border);
+  }
+
+  /* Auth slot: fixed-size container so login<->profile swap causes zero CLS */
+  .auth-slot {
+    position: relative;
+    min-width: 80px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+  }
+
+  .auth-slot .login-btn {
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+  }
+
+  .auth-slot .user-profile {
+    visibility: hidden;
+  }
+
+  /* User Profile */
+  .user-profile {
+    position: relative;
+  }
+
+  .profile-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    border-radius: 50%;
+  }
+
+  .profile-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--primary);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 0.9rem;
+  }
+
+  .profile-btn:hover .profile-avatar {
+    box-shadow: 0 0 0 3px var(--primary-light);
+  }
+
+  .profile-dropdown {
+    position: absolute;
+    top: calc(100% + 0.5rem);
+    right: 0;
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-lg);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.15s ease, visibility 0.15s ease;
+    min-width: 220px;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .profile-dropdown {
+      background: var(--bg-secondary);
+    }
+  }
+
+  .user-profile:hover .profile-dropdown {
+    opacity: 1;
+    visibility: visible;
+  }
+
+  .profile-info {
+    padding: 1rem;
+  }
+
+  .profile-name {
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    margin-bottom: 0.5rem;
+    word-break: break-all;
+  }
+
+  .profile-role {
+    font-size: 0.75rem;
+    text-transform: capitalize;
+    background: var(--primary-light);
+    color: var(--primary);
+    padding: 0.25rem 0.5rem;
+    border-radius: 12px;
+    display: inline-block;
+    font-weight: 500;
+  }
+
+  .profile-divider {
+    height: 1px;
+    background: var(--border);
+    margin: 0 0.5rem;
+  }
+
+  .profile-links {
+    padding: 0.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .profile-link {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.625rem 0.75rem;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    border-radius: var(--radius-sm);
+    transition: background 0.15s ease, color 0.15s ease;
+    background: none;
+    border: none;
+    cursor: pointer;
+    width: 100%;
+    text-align: left;
+    font-family: inherit;
+  }
+
+  .profile-link:hover {
+    background: var(--primary-light);
+    color: var(--primary);
+  }
+
+  .profile-link svg {
+    flex-shrink: 0;
+  }
+
+  .logout-btn:hover {
+    background: oklch(0.9 0.05 0 / 50%);
+    color: oklch(0.577 0.245 27.325);
   }
 
   @media (max-width: 768px) {
@@ -274,3 +585,88 @@ const categories = Object.keys(docsByCategory).sort();
     }
   }
 </style>
+
+<script is:inline>
+  // ─── Ultra-minimal header JS — all heavy work lazy-loaded on interaction ───
+  (function(){
+    // Theme selector (event delegation, no per-element listeners)
+    var tc = document.querySelector('.theme-options');
+    if (tc) tc.addEventListener('click', function(e) {
+      var o = e.target.closest('.theme-option');
+      if (!o) return;
+      var h = o.getAttribute('data-hue');
+      if (!h) return;
+      var s = document.documentElement.style;
+      var d = window.matchMedia('(prefers-color-scheme:dark)').matches;
+      if (d) {
+        s.setProperty('--primary', 'oklch(0.72 0.12 ' + h + ')');
+        s.setProperty('--primary-hover', 'oklch(0.78 0.12 ' + h + ')');
+        s.setProperty('--primary-light', 'oklch(0.25 0.06 ' + h + ')');
+        s.setProperty('--primary-dark', 'oklch(0.82 0.10 ' + h + ')');
+      } else {
+        s.setProperty('--primary', 'oklch(0.35 0.08 ' + h + ')');
+        s.setProperty('--primary-hover', 'oklch(0.30 0.08 ' + h + ')');
+        s.setProperty('--primary-light', 'oklch(0.94 0.03 ' + h + ')');
+        s.setProperty('--primary-dark', 'oklch(0.22 0.06 ' + h + ')');
+      }
+      try { localStorage.setItem('theme-hue', h); } catch(e){}
+    });
+
+    // Lazy-load docs nav ONLY when user hovers on the Docs dropdown
+    var navLoaded = false;
+    var dd = document.querySelector('.dropdown');
+    if (dd) dd.addEventListener('mouseenter', function loadNav() {
+      if (navLoaded) return;
+      navLoaded = true;
+      fetch('/api/docs/nav').then(function(r){return r.json()}).then(function(d){
+        if (!d.success) return;
+        var el = document.getElementById('docs-nav-content');
+        if (!el) return;
+        var html = '';
+        d.categories.forEach(function(cat){
+          var docs = d.docsByCategory[cat];
+          html += '<div class="dropdown-section"><div class="dropdown-category">' + cat + '</div><div class="dropdown-items">';
+          docs.forEach(function(doc){ html += '<a href="/docs/' + doc.category + '/' + doc.slug + '" class="dropdown-item">' + doc.title + '</a>'; });
+          html += '</div></div>';
+        });
+        el.innerHTML = html;
+      }).catch(function(){});
+    }, {once: false});
+
+    // Lazy-load auth state ONLY when user hovers on auth area
+    var authLoaded = false;
+    var authSlot = document.querySelector('.auth-slot');
+    if (authSlot) authSlot.addEventListener('mouseenter', function() {
+      if (authLoaded) return;
+      authLoaded = true;
+      fetch('/api/auth/me', {credentials:'include'}).then(function(r){
+        if (!r.ok) return null;
+        return r.json();
+      }).then(function(d){
+        if (!d || !d.user) return;
+        var lb = document.querySelector('.login-btn');
+        var up = document.querySelector('.user-profile');
+        if (lb) lb.style.display = 'none';
+        if (up) {
+          up.style.visibility = 'visible';
+          var pn = up.querySelector('.profile-name');
+          var pr = up.querySelector('.profile-role');
+          var pa = up.querySelector('.profile-avatar');
+          if (pn) pn.textContent = d.user.email;
+          if (pr) pr.textContent = d.user.role.replace('_', ' ');
+          if (pa) pa.textContent = d.user.email.charAt(0).toUpperCase();
+          var dl = up.querySelector('.dashboard-link');
+          if (dl && (d.user.role === 'instructor' || d.user.role === 'super_admin')) dl.style.display = 'flex';
+          var al = up.querySelector('.admin-link');
+          if (al && d.user.role === 'super_admin') al.style.display = 'flex';
+        }
+      }).catch(function(){});
+    }, {once: true});
+
+    // Logout
+    var lb = document.getElementById('logout-btn');
+    if (lb) lb.addEventListener('click', function(){
+      fetch('/api/auth/logout',{method:'POST'}).catch(function(){}).finally(function(){ window.location.href='/'; });
+    });
+  })();
+</script>

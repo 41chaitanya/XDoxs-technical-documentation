@@ -15,7 +15,10 @@ pnpm-debug.log*
 
 # environment variables
 .env
+.env.*
+!.env.example
 .env.production
+/id_rsa.pem/
 
 # macOS-specific files
 .DS_Store
@@ -25,3 +28,11 @@ pnpm-debug.log*
 
 # project explanation (internal documentation)
 project-explanation/
+
+# Terraform
+deploy/.terraform/
+deploy/.terraform.lock.hcl
+deploy/*.tfstate
+deploy/*.tfstate.backup
+deploy/terraform.tfvars
+deploy/*.tfplan

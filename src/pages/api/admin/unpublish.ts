@@ -1,0 +1,59 @@
+import type { APIRoute } from 'astro';
+import { verifyToken } from '../../../lib/auth/jwt';
+import { getDocDraft, updateDocDraft } from '../../../lib/db/docs';
+import { unpublishDoc } from '../../../lib/docs/publisher';
+import { triggerBuild } from '../../../lib/aws/codebuild';
+
+export const POST: APIRoute = async ({ request, cookies }) => {
+  try {
+    const token = cookies.get('auth_token')?.value;
+    if (!token) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401, headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    const payload = verifyToken(token);
+    if (!payload || payload.role !== 'super_admin') {
+      return new Response(JSON.stringify({ error: 'Forbidden' }), {
+        status: 403, headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    const { draftId } = await request.json();
+    if (!draftId) {
+      return new Response(JSON.stringify({ error: 'Draft ID required' }), {
+        status: 400, headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    const draft = await getDocDraft(draftId);
+    if (!draft) {
+      return new Response(JSON.stringify({ error: 'Draft not found' }), {
+        status: 404, headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Delete the .md file from src/content/docs
+    try {
+      await unpublishDoc(draft.category, draft.slug);
+    } catch {
+      // File may already be gone, continue
+    }
+
+    // Revert status back to draft in MongoDB
+    await updateDocDraft(draftId, { status: 'draft' });
+
+    // Trigger rebuild to remove unpublished doc from static site + invalidate CloudFront
+    const buildId = await triggerBuild('unpublish', draft.category, draft.slug);
+
+    return new Response(JSON.stringify({ success: true, buildId }), {
+      status: 200, headers: { 'Content-Type': 'application/json' },
+    });
+  } catch (error) {
+    console.error('Unpublish error:', error);
+    return new Response(JSON.stringify({ error: 'Internal server error' }), {
+      status: 500, headers: { 'Content-Type': 'application/json' },
+    });
+  }
+};

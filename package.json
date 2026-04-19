@@ -8,16 +8,36 @@
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",
+    "start": "node start.mjs",
     "preview": "astro preview",
-    "astro": "astro"
+    "astro": "astro",
+    "seed": "tsx scripts/seed-users.ts",
+    "seed:docs": "tsx scripts/seed-docs.ts",
+    "reset:docs": "tsx scripts/reset-docs.ts"
   },
   "dependencies": {
+    "@astrojs/check": "^0.9.8",
     "@astrojs/mdx": "^5.0.3",
+    "@astrojs/node": "^10.0.4",
     "@astrojs/sitemap": "^3.7.2",
+    "@aws-sdk/client-cloudfront": "^3.1032.0",
+    "@aws-sdk/client-codebuild": "^3.1032.0",
+    "@aws-sdk/client-s3": "^3.1032.0",
+    "@aws-sdk/s3-request-presigner": "^3.1032.0",
     "astro": "^6.1.3",
     "bcryptjs": "^3.0.3",
     "cookie": "^1.1.1",
+    "highlight.js": "^11.11.1",
     "jsonwebtoken": "^9.0.3",
-    "lucide-react": "^1.7.0"
+    "lucide-react": "^1.7.0",
+    "marked": "^17.0.6",
+    "mongodb": "^7.1.1",
+    "mongoose": "^9.4.1",
+    "typescript": "^5.9.3"
+  },
+  "devDependencies": {
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/marked": "^5.0.2",
+    "tsx": "^4.21.0"
   }
 }

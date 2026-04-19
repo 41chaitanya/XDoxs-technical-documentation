@@ -1,5 +1,6 @@
 ---
-import { getCollection } from 'astro:content';
+import { getDb } from '../lib/db/mongodb';
+import { COLLECTIONS } from '../lib/db/models';
 
 interface Props {
   currentCategory: string;
@@ -8,27 +9,29 @@ interface Props {
 
 const { currentCategory, currentDocId } = Astro.props;
 
-const allDocs = await getCollection('docs');
-
-// Get docs from current category only
-const categoryDocs = allDocs.filter(doc => doc.data.category === currentCategory);
+const db = await getDb();
+const categoryDocs = await db.collection(COLLECTIONS.DOC_DRAFTS)
+  .find({ status: 'approved', category: currentCategory })
+  .project({ title: 1, category: 1, slug: 1 })
+  .toArray();
 ---
 
 <aside class="docs-sidebar">
   <div class="sidebar-content">
-    <h2 class="sidebar-title">{currentCategory}</h2>
+    <p class="sidebar-title">{currentCategory}</p>
     
     <nav class="sidebar-nav">
       <ul class="doc-list">
-        {categoryDocs.map(doc => {
-          const isActive = doc.id === currentDocId;
+        {categoryDocs.map((doc: any) => {
+          const docPath = `${doc.category}/${doc.slug}`;
+          const isActive = docPath === currentDocId;
           return (
             <li>
               <a 
-                href={`/docs/${doc.id}`}
+                href={`/docs/${docPath}`}
                 class={isActive ? 'active' : ''}
               >
-                {doc.data.title}
+                {doc.title}
               </a>
             </li>
           );
@@ -77,7 +80,7 @@ const categoryDocs = allDocs.filter(doc => doc.data.category === currentCategory
     display: block;
     padding: 0.5rem 0.75rem;
     border-radius: var(--radius-sm);
-    transition: all 0.2s ease;
+    transition: background-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
   }
 
   .doc-list a:hover {
@@ -87,10 +90,8 @@ const categoryDocs = allDocs.filter(doc => doc.data.category === currentCategory
   }
 
   .doc-list a.active {
-    background: var(--primary-light);
     color: var(--primary);
     font-weight: 600;
-    border-left: 3px solid var(--primary);
   }
 
   @media (max-width: 1024px) {
