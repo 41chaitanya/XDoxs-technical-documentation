@@ -2,7 +2,6 @@ import type { APIRoute } from 'astro';
 import { verifyToken } from '../../../lib/auth/jwt';
 import { getDocDraft, updateDocDraft } from '../../../lib/db/docs';
 import { publishDocToStatic } from '../../../lib/docs/publisher';
-import { uploadMarkdown } from '../../../lib/aws/s3';
 import { invalidateDocPath, invalidateNavOnly } from '../../../lib/aws/cloudfront';
 
 export const POST: APIRoute = async ({ request, cookies }) => {
@@ -45,30 +44,21 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     // Detect if this is a first publish or republish
     const isRepublish = !!draft.publishedAt;
 
-    // Pre-render HTML and save — do this BEFORE status update
+    // Pre-render HTML (reads markdown from S3, writes HTML to S3)
     await publishDocToStatic(draft);
 
-    // Update status to approved
+    // Update status in MongoDB (no content fields)
     await updateDocDraft(draftId, {
       status: 'approved',
       publishedAt: new Date(),
     });
 
-    // Sync final markdown to S3
-    try {
-      await uploadMarkdown(draft.category, draft.slug, draft.content || '');
-    } catch (s3Err) {
-      console.error('S3 sync failed (non-blocking):', s3Err);
-    }
-
     // Smart CloudFront invalidation — NO full /* invalidation
     let invalidationId: string | null = null;
     try {
       if (isRepublish) {
-        // Edited doc: invalidate specific doc path + nav + homepage
         invalidationId = await invalidateDocPath(draft.category, draft.slug);
       } else {
-        // New doc: only invalidate nav + homepage (sidebar update)
         invalidationId = await invalidateNavOnly();
       }
     } catch (cfErr) {

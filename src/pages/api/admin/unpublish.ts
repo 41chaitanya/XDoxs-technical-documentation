@@ -34,11 +34,11 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       });
     }
 
-    // Delete the .md file from src/content/docs
+    // Delete rendered HTML from S3 and revert status in MongoDB
     try {
       await unpublishDoc(draft.category, draft.slug);
     } catch {
-      // File may already be gone, continue
+      // Non-blocking — HTML may already be gone
     }
 
     // Revert status back to draft in MongoDB

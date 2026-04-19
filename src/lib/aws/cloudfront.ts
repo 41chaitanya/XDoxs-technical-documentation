@@ -13,17 +13,22 @@ import {
   CreateInvalidationCommand,
 } from '@aws-sdk/client-cloudfront';
 
-const REGION = import.meta.env.AWS_REGION || process.env.AWS_REGION || 'ap-south-2';
+const REGION = process.env.AWS_REGION || 'ap-south-2';
 const DISTRIBUTION_ID =
-  import.meta.env.CLOUDFRONT_DISTRIBUTION_ID ||
-  process.env.CLOUDFRONT_DISTRIBUTION_ID ||
-  '';
+  process.env.CLOUDFRONT_DISTRIBUTION_ID || '';
+const ACCESS_KEY = process.env.AWS_ACCESS_KEY_ID || '';
+const SECRET_KEY = process.env.AWS_SECRET_ACCESS_KEY || '';
 
 let _client: CloudFrontClient | null = null;
 
 function getCFClient(): CloudFrontClient {
   if (!_client) {
-    _client = new CloudFrontClient({ region: REGION });
+    _client = new CloudFrontClient({
+      region: REGION,
+      ...(ACCESS_KEY && SECRET_KEY
+        ? { credentials: { accessKeyId: ACCESS_KEY, secretAccessKey: SECRET_KEY } }
+        : {}),
+    });
   }
   return _client;
 }

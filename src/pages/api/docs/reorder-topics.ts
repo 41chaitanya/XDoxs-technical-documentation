@@ -1,7 +1,8 @@
 import type { APIRoute } from 'astro';
 import { verifyToken } from '../../../lib/auth/jwt';
 import { getDocDraft, updateDocDraft } from '../../../lib/db/docs';
-import { uploadMarkdown } from '../../../lib/aws/s3';
+import { splitMarkdownIntoTopics } from '../../../lib/markdown/splitter';
+import { uploadMarkdown, getMarkdown } from '../../../lib/aws/s3';
 
 export const POST: APIRoute = async ({ request, cookies }) => {
   try {
@@ -24,19 +25,36 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403, headers: { 'Content-Type': 'application/json' } });
     }
 
-    const topicMap = new Map((draft.topics || []).map(t => [t.id, t]));
-    const reordered = topicIds
+    // Load content from S3 and split into topics
+    const markdown = await getMarkdown(draft.category, draft.slug) || '';
+    const splitTopics = splitMarkdownIntoTopics(markdown);
+    const topicIndex = draft.topics || [];
+
+    // Build a map from topic id -> position in current order
+    const idToPos = new Map(topicIndex.map((t, i) => [t.id, i]));
+
+    // Reorder topic index and content based on new order
+    const reorderedIndex = topicIds
       .map((id: string, index: number) => {
-        const t = topicMap.get(id);
-        return t ? { ...t, order: index } : null;
+        const meta = topicIndex.find(t => t.id === id);
+        return meta ? { ...meta, order: index } : null;
       })
       .filter((t): t is NonNullable<typeof t> => t !== null);
 
-    const fullContent = reordered.map(t => t.content).join('\n\n');
-    await updateDocDraft(draftId, { topics: reordered, content: fullContent });
+    // Reorder content sections to match
+    const reorderedContent = topicIds
+      .map((id: string) => {
+        const pos = idToPos.get(id);
+        return pos !== undefined && splitTopics[pos] ? splitTopics[pos].content : '';
+      })
+      .filter(Boolean);
 
-    // Sync to S3
-    try { await uploadMarkdown(draft.category, draft.slug, fullContent); } catch (e) { console.error('S3 sync failed:', e); }
+    // Upload reordered content to S3
+    const fullContent = reorderedContent.join('\n\n');
+    await uploadMarkdown(draft.category, draft.slug, fullContent);
+
+    // Update topic index in MongoDB (no content)
+    await updateDocDraft(draftId, { topics: reorderedIndex });
 
     return new Response(JSON.stringify({ success: true }), { status: 200, headers: { 'Content-Type': 'application/json' } });
   } catch (error) {

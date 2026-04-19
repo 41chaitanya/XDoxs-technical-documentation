@@ -1,6 +1,6 @@
-// Document operations
+// Document operations — MongoDB stores metadata only, content lives in S3
 import { getDb } from './mongodb';
-import { COLLECTIONS, type DocDraft } from './models';
+import { COLLECTIONS, type DocDraft, type TopicIndex, stripContentFields } from './models';
 import { ObjectId } from 'mongodb';
 
 export async function createDocDraft(data: {
@@ -10,13 +10,13 @@ export async function createDocDraft(data: {
   title: string;
   slug: string;
   description: string;
-  content: string;
   tags: string[];
-  topics?: import('./models').Topic[];
+  topics?: TopicIndex[];
 }): Promise<DocDraft> {
   const db = await getDb();
   const draftsCollection = db.collection<DocDraft>(COLLECTIONS.DOC_DRAFTS);
   
+  // Only metadata — no content, renderedHtml, or renderedHtmlHi
   const draft: DocDraft = {
     ...data,
     status: 'draft',
@@ -24,7 +24,7 @@ export async function createDocDraft(data: {
     updatedAt: new Date(),
   };
   
-  const result = await draftsCollection.insertOne(draft);
+  const result = await draftsCollection.insertOne(stripContentFields(draft) as any);
   draft._id = result.insertedId;
   
   return draft;
@@ -37,11 +37,14 @@ export async function updateDocDraft(
   const db = await getDb();
   const draftsCollection = db.collection<DocDraft>(COLLECTIONS.DOC_DRAFTS);
   
+  // Strip S3-only fields — never persist content to MongoDB
+  const safeUpdates = stripContentFields({ ...updates });
+  
   const result = await draftsCollection.findOneAndUpdate(
     { _id: new ObjectId(draftId) } as any,
     { 
       $set: { 
-        ...updates, 
+        ...safeUpdates, 
         updatedAt: new Date() 
       } 
     },

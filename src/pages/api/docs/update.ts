@@ -2,7 +2,8 @@ import type { APIRoute } from 'astro';
 import { verifyToken } from '../../../lib/auth/jwt';
 import { updateDocDraft, getDocDraft } from '../../../lib/db/docs';
 import { splitMarkdownIntoTopics } from '../../../lib/markdown/splitter';
-import { uploadMarkdown } from '../../../lib/aws/s3';
+import { topicsToIndex } from '../../../lib/db/models';
+import { uploadMarkdown, getMarkdown } from '../../../lib/aws/s3';
 
 export const POST: APIRoute = async ({ request, cookies }) => {
   try {
@@ -50,28 +51,25 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       });
     }
 
-    // Handle append mode
+    // Handle append mode — fetch existing content from S3
     let finalContent = content;
     if (append && content) {
-      finalContent = draft.content ? `${draft.content}\n\n${content}` : content;
+      const existingContent = await getMarkdown(draft.category, draft.slug) || '';
+      finalContent = existingContent ? `${existingContent}\n\n${content}` : content;
     }
 
     // Re-split topics if content changed
     const topics = finalContent ? splitMarkdownIntoTopics(finalContent) : draft.topics;
     
-    const updatedDraft = await updateDocDraft(draftId, { 
-      content: finalContent,
-      topics 
-    });
-
-    // Sync updated content to S3
+    // Upload content to S3 (primary storage)
     if (finalContent && draft.category && draft.slug) {
-      try {
-        await uploadMarkdown(draft.category, draft.slug, finalContent);
-      } catch (s3Err) {
-        console.error('S3 sync failed (non-blocking):', s3Err);
-      }
+      await uploadMarkdown(draft.category, draft.slug, finalContent);
     }
+
+    // MongoDB gets only topic index — no content
+    const updatedDraft = await updateDocDraft(draftId, { 
+      topics: topics ? topicsToIndex(topics as any) : undefined,
+    });
     
     return new Response(JSON.stringify({ success: true, draft: updatedDraft }), {
       status: 200,
@@ -107,7 +105,7 @@ export const PUT: APIRoute = async ({ request, cookies }) => {
     }
     
     const data = await request.json();
-    const { draftId, ...updates } = data;
+    const { draftId, content, topics, ...metadataUpdates } = data;
     
     if (!draftId) {
       return new Response(JSON.stringify({ error: 'Draft ID required' }), {
@@ -133,14 +131,31 @@ export const PUT: APIRoute = async ({ request, cookies }) => {
     }
     
     // Auto-unpublish: editing content/topics of a published doc marks it as draft
-    const hasContentChange = updates.content !== undefined || updates.topics !== undefined;
-    const isStatusExplicit = updates.status !== undefined;
+    const hasContentChange = content !== undefined || topics !== undefined;
+    const isStatusExplicit = metadataUpdates.status !== undefined;
     const wasUnpublished = draft.status === 'approved' && hasContentChange && !isStatusExplicit;
     if (wasUnpublished) {
-      updates.status = 'draft';
+      metadataUpdates.status = 'draft';
     }
 
-    const updatedDraft = await updateDocDraft(draftId, updates);
+    // Upload content to S3 if provided
+    if (content && draft.category && draft.slug) {
+      await uploadMarkdown(draft.category, draft.slug, content);
+    }
+
+    // Build MongoDB update — topic index (no content), plus metadata
+    const mongoUpdates: Record<string, any> = { ...metadataUpdates };
+    if (topics) {
+      // Strip content from topics before storing in MongoDB
+      mongoUpdates.topics = topics.map((t: any) => ({
+        id: t.id,
+        title: t.title,
+        slug: t.slug,
+        order: t.order,
+      }));
+    }
+
+    const updatedDraft = await updateDocDraft(draftId, mongoUpdates);
     
     return new Response(JSON.stringify({ success: true, draft: updatedDraft, wasUnpublished }), {
       status: 200,

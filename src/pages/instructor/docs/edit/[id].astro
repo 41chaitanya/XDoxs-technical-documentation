@@ -1,57 +1,100 @@
 ---
-import BaseLayout from '../../../../layouts/BaseLayout.astro';
-import Header from '../../../../components/Header.astro';
-import { verifyToken } from '../../../../lib/auth/jwt';
-import { getDocDraft } from '../../../../lib/db/docs';
-import { splitMarkdownIntoTopics } from '../../../../lib/markdown/splitter';
-import { renderMarkdown } from '../../../../lib/markdown/render';
-import { extractLangBlocks } from '../../../../lib/markdown/lang';
+import BaseLayout from "../../../../layouts/BaseLayout.astro";
+import Header from "../../../../components/Header.astro";
+import { verifyToken } from "../../../../lib/auth/jwt";
+import { getDocDraft } from "../../../../lib/db/docs";
+import { splitMarkdownIntoTopics } from "../../../../lib/markdown/splitter";
+import { renderMarkdown } from "../../../../lib/markdown/render";
+import { extractLangBlocks } from "../../../../lib/markdown/lang";
+import { getMarkdown } from "../../../../lib/aws/s3";
+import type { Topic } from "../../../../lib/db/models";
 
 export const prerender = false;
 
-const token = Astro.cookies.get('auth_token')?.value;
-if (!token) return Astro.redirect('/login');
+const token = Astro.cookies.get("auth_token")?.value;
+if (!token) return Astro.redirect("/login");
 
 const payload = verifyToken(token);
-if (!payload || (payload.role !== 'instructor' && payload.role !== 'super_admin')) {
-  return Astro.redirect('/login');
+if (
+  !payload ||
+  (payload.role !== "instructor" && payload.role !== "super_admin")
+) {
+  return Astro.redirect("/login");
 }
 
 const { id } = Astro.params;
-if (!id) return Astro.redirect('/instructor/dashboard');
+if (!id) return Astro.redirect("/instructor/dashboard");
 
 let draft = await getDocDraft(id);
-if (!draft) return Astro.redirect('/instructor/dashboard');
+if (!draft) return Astro.redirect("/instructor/dashboard");
 
-if (draft.instructorId !== payload.userId && payload.role !== 'super_admin') {
-  return Astro.redirect('/instructor/dashboard');
+if (draft.instructorId !== payload.userId && payload.role !== "super_admin") {
+  return Astro.redirect("/instructor/dashboard");
+}
+
+// Load raw markdown from S3 (primary content storage)
+let rawContent = "";
+try {
+  rawContent = (await getMarkdown(draft.category, draft.slug)) || "";
+} catch (s3Err) {
+  console.error(
+    `❌ S3 getMarkdown failed for ${draft.category}/${draft.slug}:`,
+    s3Err,
+  );
+}
+
+if (!rawContent) {
+  console.warn(
+    `⚠️  No content found in S3 for ${draft.category}/${draft.slug} — editor will be empty`,
+  );
 }
 
 // Check if doc is bilingual
-const { en: enContent, hi: hiContent } = extractLangBlocks(String(draft.content || ''));
+const { en: enContent, hi: hiContent } = extractLangBlocks(rawContent);
 const isBilingual = !!hiContent;
 
 // For bilingual docs — always re-split from EN content only
-const contentToSplit = isBilingual ? enContent : String(draft.content || '');
+const contentToSplit = isBilingual ? enContent : rawContent;
 
-if (!draft.topics || draft.topics.length === 0 || isBilingual) {
-  const splitTopics = splitMarkdownIntoTopics(contentToSplit);
-  await fetch(`${Astro.url.origin}/api/docs/update`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json', 'Cookie': `auth_token=${token}` },
-    body: JSON.stringify({ draftId: id, topics: splitTopics, content: draft.content }),
-  });
-  draft.topics = splitTopics;
+// Split markdown into topics with content
+const splitTopics = splitMarkdownIntoTopics(contentToSplit);
+
+// Merge topic index from MongoDB with content from the split
+const topicIndex = draft.topics || [];
+let topics: Topic[];
+
+if (topicIndex.length > 0 && topicIndex.length === splitTopics.length) {
+  // Merge: use IDs from MongoDB, content from split
+  topics = topicIndex.map((meta, i) => ({
+    id: meta.id,
+    title: meta.title,
+    slug: meta.slug,
+    order: meta.order,
+    content: splitTopics[i]?.content || "",
+  }));
+} else {
+  // Fallback: use split topics directly (new doc or mismatch)
+  topics = splitTopics;
+  // Sync topic index back to MongoDB
+  if (splitTopics.length > 0) {
+    await fetch(`${Astro.url.origin}/api/docs/update`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Cookie: `auth_token=${token}`,
+      },
+      body: JSON.stringify({ draftId: id, topics: splitTopics }),
+    });
+  }
 }
 
-const topics = draft.topics || [];
 const firstTopic = topics[0];
-const initialHtml = firstTopic ? await renderMarkdown(firstTopic.content) : '';
+const initialHtml = firstTopic ? await renderMarkdown(firstTopic.content) : "";
 
 // Extract HI topic titles from HI content block only
 function extractHiTitles(hiBlock: string): string[] {
   const titles: string[] = [];
-  for (const line of hiBlock.split('\n')) {
+  for (const line of hiBlock.split("\n")) {
     const m = line.match(/^##\s+(.+)$/);
     if (m) titles.push(m[1].trim());
   }
@@ -66,12 +109,16 @@ const hiTopicContents: string[] = [];
 if (isBilingual) {
   const hiSections = hiContent.split(/^## /gm).slice(1);
   topics.forEach((_, i) => {
-    hiTopicContents.push(hiSections[i] ? '## ' + hiSections[i].trim() : '');
+    hiTopicContents.push(hiSections[i] ? "## " + hiSections[i].trim() : "");
   });
 }
 ---
+
 <BaseLayout title={`Edit: ${draft.title} - XDoxs`}>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" />
+  <link
+    rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css"
+  />
   <Header />
 
   <div class="editor-layout">
@@ -82,76 +129,133 @@ if (isBilingual) {
           <span class="doc-title">{draft.title}</span>
           <span class="cat-badge">{draft.category}</span>
         </div>
-        {isBilingual && (
-          <div class="lang-toggle">
-            <button class="lang-btn active" id="sidebar-btn-en" onclick="switchSidebarLang('en')">English</button>
-            <button class="lang-btn" id="sidebar-btn-hi" onclick="switchSidebarLang('hi')">Hinglish</button>
-          </div>
-        )}
+        {
+          isBilingual && (
+            <div class="lang-toggle">
+              <button
+                class="lang-btn active"
+                id="sidebar-btn-en"
+                onclick="switchSidebarLang('en')"
+              >
+                English
+              </button>
+              <button
+                class="lang-btn"
+                id="sidebar-btn-hi"
+                onclick="switchSidebarLang('hi')"
+              >
+                Hinglish
+              </button>
+            </div>
+          )
+        }
       </div>
 
       <!-- EN Topics List -->
       <div class="topics-list" id="topics-list">
-        {topics.map((topic, i) => (
-          <div class="topic-item" data-id={topic.id} data-index={i} draggable="true">
-            <span class="topic-drag">⠿</span>
-            <span class="topic-name">{topic.title}</span>
-            <div class="topic-controls">
-              <button class="ctrl-btn ctrl-del btn-delete" title="Delete">✕</button>
+        {
+          topics.map((topic, i) => (
+            <div
+              class="topic-item"
+              data-id={topic.id}
+              data-index={i}
+              draggable="true"
+            >
+              <span class="topic-drag">⠿</span>
+              <span class="topic-name">{topic.title}</span>
+              <div class="topic-controls">
+                <button class="ctrl-btn ctrl-del btn-delete" title="Delete">
+                  ✕
+                </button>
+              </div>
             </div>
-          </div>
-        ))}
+          ))
+        }
       </div>
 
       <!-- HI Topics List (hidden by default) -->
-      {isBilingual && (
-        <div class="topics-list" id="hi-topics-list" style="display:none">
-          {hiTopicTitles.map((title, i) => (
-            <div class="topic-item hi-topic-item" data-id={topics[i]?.id} data-index={i}>
-              <span class="topic-drag">⠿</span>
-              <span class="topic-name">{title}</span>
-            </div>
-          ))}
-        </div>
-      )}
+      {
+        isBilingual && (
+          <div class="topics-list" id="hi-topics-list" style="display:none">
+            {hiTopicTitles.map((title, i) => (
+              <div
+                class="topic-item hi-topic-item"
+                data-id={topics[i]?.id}
+                data-index={i}
+              >
+                <span class="topic-drag">⠿</span>
+                <span class="topic-name">{title}</span>
+              </div>
+            ))}
+          </div>
+        )
+      }
 
       <div class="add-topic-actions">
         <button class="add-topic-btn" id="add-topic-btn">+ Add Topic</button>
-        <button class="upload-topic-btn" id="upload-topic-btn" title="Upload .md file as topic">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+        <button
+          class="upload-topic-btn"
+          id="upload-topic-btn"
+          title="Upload .md file as topic"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <path
+              d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"
+            ></path>
           </svg>
           Upload Topic
         </button>
       </div>
-      <input type="file" id="topic-file-input" accept=".md,.markdown" hidden>
+      <input type="file" id="topic-file-input" accept=".md,.markdown" hidden />
 
       <div class="sidebar-actions">
         <button class="btn-save" id="save-btn">Save</button>
-        {payload.role === 'super_admin' ? (
-          draft.status === 'approved' ? (
-            <span class="status-note published-note" id="status-badge">✓ Published</span>
-          ) : draft.publishedAt ? (
-            <button class="btn-republish" id="admin-publish-btn">Republish</button>
+        {
+          payload.role === "super_admin" ? (
+            draft.status === "approved" ? (
+              <span class="status-note published-note" id="status-badge">
+                ✓ Published
+              </span>
+            ) : draft.publishedAt ? (
+              <button class="btn-republish" id="admin-publish-btn">
+                Republish
+              </button>
+            ) : (
+              <button class="btn-publish-direct" id="admin-publish-btn">
+                Publish
+              </button>
+            )
+          ) : draft.status === "draft" || draft.status === "rejected" ? (
+            <button class="btn-submit" id="submit-btn">
+              Submit for Review
+            </button>
+          ) : draft.status === "approved" ? (
+            <button class="btn-republish" id="republish-btn">
+              Republish Changes
+            </button>
           ) : (
-            <button class="btn-publish-direct" id="admin-publish-btn">Publish</button>
+            <span class="status-note">
+              Status: {draft.status.replace("_", " ")}
+            </span>
           )
-        ) : (
-          draft.status === 'draft' || draft.status === 'rejected' ? (
-            <button class="btn-submit" id="submit-btn">Submit for Review</button>
-          ) : draft.status === 'approved' ? (
-            <button class="btn-republish" id="republish-btn">Republish Changes</button>
-          ) : (
-            <span class="status-note">Status: {draft.status.replace('_', ' ')}</span>
-          )
-        )}
+        }
       </div>
     </aside>
 
     <!-- CENTER: Editor / Preview -->
     <main class="editor-main">
       <div class="editor-topbar">
-        <span class="active-topic-title" id="active-topic-title">{firstTopic?.title || 'No topics'}</span>
+        <span class="active-topic-title" id="active-topic-title"
+          >{firstTopic?.title || "No topics"}</span
+        >
         <div class="view-toggle">
           <button class="toggle-btn active" id="btn-edit">Edit</button>
           <button class="toggle-btn" id="btn-preview">Preview</button>
@@ -163,29 +267,60 @@ if (isBilingual) {
         <button class="tool-btn" data-fmt="h2" title="Heading 2">H2</button>
         <button class="tool-btn" data-fmt="h3" title="Heading 3">H3</button>
         <div class="tool-sep"></div>
-        <button class="tool-btn" data-fmt="bold" title="Bold"><strong>B</strong></button>
-        <button class="tool-btn" data-fmt="italic" title="Italic"><em>I</em></button>
-        <button class="tool-btn" data-fmt="underline" title="Underline"><u>U</u></button>
-        <button class="tool-btn" data-fmt="code" title="Inline code">&#96;</button>
+        <button class="tool-btn" data-fmt="bold" title="Bold"
+          ><strong>B</strong></button
+        >
+        <button class="tool-btn" data-fmt="italic" title="Italic"
+          ><em>I</em></button
+        >
+        <button class="tool-btn" data-fmt="underline" title="Underline"
+          ><u>U</u></button
+        >
+        <button class="tool-btn" data-fmt="code" title="Inline code"
+          >&#96;</button
+        >
         <div class="tool-sep"></div>
-        <button class="tool-btn" data-fmt="highlight" title="Highlight text background">▐H</button>
-        <button class="tool-btn" data-fmt="color-accent" title="Theme color — changes with theme" style="color:var(--primary); font-weight:700; border-color:var(--primary)">A</button>
+        <button
+          class="tool-btn"
+          data-fmt="highlight"
+          title="Highlight text background">▐H</button
+        >
+        <button
+          class="tool-btn"
+          data-fmt="color-accent"
+          title="Theme color — changes with theme"
+          style="color:var(--primary); font-weight:700; border-color:var(--primary)"
+          >A</button
+        >
         <div class="tool-sep"></div>
-        <button class="tool-btn" data-fmt="codeblock" title="Code block">{ }</button>
-        <button class="tool-btn" data-fmt="ul" title="Bullet list">• List</button>
-        <button class="tool-btn" data-fmt="ol" title="Numbered list">1. List</button>
-        <button class="tool-btn" data-fmt="blockquote" title="Blockquote">" "</button>
+        <button class="tool-btn" data-fmt="codeblock" title="Code block"
+          >{}</button
+        >
+        <button class="tool-btn" data-fmt="ul" title="Bullet list"
+          >• List</button
+        >
+        <button class="tool-btn" data-fmt="ol" title="Numbered list"
+          >1. List</button
+        >
+        <button class="tool-btn" data-fmt="blockquote" title="Blockquote"
+          >" "</button
+        >
         <button class="tool-btn" data-fmt="hr" title="Divider">—</button>
       </div>
 
       <!-- Markdown textarea (edit mode) -->
       <div class="md-editor-wrapper" id="md-editor-wrapper">
         <div class="md-editor-highlight" id="md-highlight"></div>
-        <textarea class="md-editor" id="md-editor" spellcheck="false"></textarea>
+        <textarea class="md-editor" id="md-editor" spellcheck="false"
+        ></textarea>
       </div>
 
       <!-- Preview (preview mode) -->
-      <div class="md-preview markdown-body" id="md-preview" style="display:none">
+      <div
+        class="md-preview markdown-body"
+        id="md-preview"
+        style="display:none"
+      >
         <Fragment set:html={initialHtml} />
       </div>
     </main>
@@ -195,9 +330,7 @@ if (isBilingual) {
       <div class="ai-assistant-panel">
         <div class="ai-header">
           <h3>AI Assistant</h3>
-          {isBilingual && (
-            <span class="bilingual-badge">Bilingual</span>
-          )}
+          {isBilingual && <span class="bilingual-badge">Bilingual</span>}
         </div>
 
         <div class="ai-chat-messages" id="ai-chat-messages">
@@ -216,13 +349,20 @@ if (isBilingual) {
         </div>
 
         <div class="ai-chat-input-area">
-          <textarea 
-            id="ai-chat-input" 
+          <textarea
+            id="ai-chat-input"
             placeholder="Example: Add more examples to current topic..."
-            rows="2"
-          ></textarea>
+            rows="2"></textarea>
           <button class="ai-send-btn" id="ai-send-btn">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
               <line x1="22" y1="2" x2="11" y2="13"></line>
               <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
             </svg>
@@ -231,8 +371,18 @@ if (isBilingual) {
       </div>
 
       <button class="meta-open-btn" id="meta-open-btn" title="Edit Metadata">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <circle cx="12" cy="12" r="3"></circle><path
+            d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"
+          ></path>
         </svg>
         Metadata
       </button>
@@ -252,14 +402,25 @@ if (isBilingual) {
       </div>
       <div class="meta-group">
         <label>Tags</label>
-        <input type="text" id="meta-tags" value={draft.tags?.join(', ') || ''} placeholder="js, beginner" />
+        <input
+          type="text"
+          id="meta-tags"
+          value={draft.tags?.join(", ") || ""}
+          placeholder="js, beginner"
+        />
       </div>
       <div class="meta-group">
         <label>Category</label>
         <select id="meta-category">
-          {['javascript','python','html','devops','react','nodejs'].map(c => (
-            <option value={c} selected={draft.category === c}>{c}</option>
-          ))}
+          {
+            ["javascript", "python", "html", "devops", "react", "nodejs"].map(
+              (c) => (
+                <option value={c} selected={draft.category === c}>
+                  {c}
+                </option>
+              ),
+            )
+          }
         </select>
       </div>
       <button class="meta-save-btn" id="meta-save-btn">Save Metadata</button>
@@ -270,7 +431,11 @@ if (isBilingual) {
   <div class="modal" id="add-modal" style="display:none">
     <div class="modal-box">
       <h3>Add New Topic</h3>
-      <input type="text" id="new-topic-title" placeholder="Topic title e.g. Variables" />
+      <input
+        type="text"
+        id="new-topic-title"
+        placeholder="Topic title e.g. Variables"
+      />
       <div class="modal-actions">
         <button class="btn-cancel" id="cancel-add-topic">Cancel</button>
         <button class="btn-confirm" id="confirm-add-topic">Add</button>
@@ -279,8 +444,10 @@ if (isBilingual) {
   </div>
 
   <style>
-    * { box-sizing: border-box; }
-    
+    * {
+      box-sizing: border-box;
+    }
+
     .editor-layout {
       display: grid;
       grid-template-columns: 280px 1fr 260px;
@@ -344,7 +511,9 @@ if (isBilingual) {
     }
 
     .topic-item:hover .topic-name {
-      text-shadow: 0 0 8px var(--primary), 0 0 12px var(--primary);
+      text-shadow:
+        0 0 8px var(--primary),
+        0 0 12px var(--primary);
     }
 
     .topic-item.active {
@@ -416,7 +585,8 @@ if (isBilingual) {
       margin: 0.75rem 1rem;
     }
 
-    .add-topic-btn, .upload-topic-btn {
+    .add-topic-btn,
+    .upload-topic-btn {
       padding: 0.6rem;
       background: var(--primary);
       color: white;
@@ -432,7 +602,8 @@ if (isBilingual) {
       gap: 0.5rem;
     }
 
-    .add-topic-btn:hover, .upload-topic-btn:hover {
+    .add-topic-btn:hover,
+    .upload-topic-btn:hover {
       background: var(--primary-hover);
     }
 
@@ -459,7 +630,10 @@ if (isBilingual) {
       gap: 0.5rem;
     }
 
-    .btn-save, .btn-submit, .btn-republish, .btn-publish-direct {
+    .btn-save,
+    .btn-submit,
+    .btn-republish,
+    .btn-publish-direct {
       padding: 0.65rem;
       border: none;
       border-radius: 6px;
@@ -608,7 +782,7 @@ if (isBilingual) {
       color: transparent;
       caret-color: var(--text-primary);
       border: none;
-      font-family: 'Courier New', Consolas, Monaco, monospace;
+      font-family: "Courier New", Consolas, Monaco, monospace;
       font-size: 0.95rem;
       line-height: 1.7;
       resize: none;
@@ -634,7 +808,7 @@ if (isBilingual) {
       right: 0;
       bottom: 0;
       padding: 1.5rem;
-      font-family: 'Courier New', Consolas, Monaco, monospace;
+      font-family: "Courier New", Consolas, Monaco, monospace;
       font-size: 0.95rem;
       line-height: 1.7;
       white-space: pre-wrap;
@@ -821,15 +995,21 @@ if (isBilingual) {
       animation: typing 1.4s infinite;
     }
 
-    .ai-typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
-    .ai-typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+    .ai-typing-indicator span:nth-child(2) {
+      animation-delay: 0.2s;
+    }
+    .ai-typing-indicator span:nth-child(3) {
+      animation-delay: 0.4s;
+    }
 
     @keyframes typing {
-      0%, 60%, 100% { 
+      0%,
+      60%,
+      100% {
         opacity: 0.3;
         transform: scale(0.8);
       }
-      30% { 
+      30% {
         opacity: 1;
         transform: scale(1.1);
       }
@@ -1015,7 +1195,9 @@ if (isBilingual) {
       box-sizing: border-box;
     }
 
-    .meta-group textarea { resize: vertical; }
+    .meta-group textarea {
+      resize: vertical;
+    }
 
     /* MODAL */
     .modal {
@@ -1062,7 +1244,8 @@ if (isBilingual) {
       justify-content: flex-end;
     }
 
-    .btn-cancel, .btn-confirm {
+    .btn-cancel,
+    .btn-confirm {
       padding: 0.5rem 1rem;
       border: none;
       border-radius: 6px;
@@ -1083,23 +1266,38 @@ if (isBilingual) {
     }
 
     /* MARKDOWN PREVIEW STYLES */
-    .markdown-body h1, .markdown-body h2, .markdown-body h3, .markdown-body h4 {
+    .markdown-body h1,
+    .markdown-body h2,
+    .markdown-body h3,
+    .markdown-body h4 {
       margin-top: 1.5rem;
       margin-bottom: 0.75rem;
       font-weight: 600;
       color: var(--text-primary);
     }
-    .markdown-body h1 { font-size: 2rem; }
-    .markdown-body h2 { font-size: 1.5rem; border-bottom: 1px solid var(--border); padding-bottom: 0.4rem; }
-    .markdown-body h3 { font-size: 1.25rem; }
-    .markdown-body h4 { font-size: 1.1rem; }
-    .markdown-body p { margin-bottom: 1rem; }
+    .markdown-body h1 {
+      font-size: 2rem;
+    }
+    .markdown-body h2 {
+      font-size: 1.5rem;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 0.4rem;
+    }
+    .markdown-body h3 {
+      font-size: 1.25rem;
+    }
+    .markdown-body h4 {
+      font-size: 1.1rem;
+    }
+    .markdown-body p {
+      margin-bottom: 1rem;
+    }
     .markdown-body code {
       background: oklch(0.2 0 0);
       color: oklch(0.9 0 0);
       padding: 0.15rem 0.4rem;
       border-radius: 4px;
-      font-family: 'Courier New', monospace;
+      font-family: "Courier New", monospace;
       font-size: 0.9em;
     }
     .markdown-body pre {
@@ -1115,11 +1313,14 @@ if (isBilingual) {
       padding: 0;
       font-size: 0.875rem;
     }
-    .markdown-body ul, .markdown-body ol {
+    .markdown-body ul,
+    .markdown-body ol {
       margin: 1rem 0;
       padding-left: 2rem;
     }
-    .markdown-body li { margin: 0.4rem 0; }
+    .markdown-body li {
+      margin: 0.4rem 0;
+    }
     .markdown-body blockquote {
       border-left: 4px solid var(--primary);
       padding-left: 1rem;
@@ -1127,49 +1328,95 @@ if (isBilingual) {
       color: var(--text-secondary);
       font-style: italic;
     }
-    .markdown-body a { color: var(--primary); text-decoration: none; }
-    .markdown-body a:hover { text-decoration: underline; }
-    .markdown-body hr { border: none; border-top: 2px solid var(--border); margin: 1.5rem 0; }
-    .markdown-body table { width: 100%; border-collapse: collapse; margin: 1.25rem 0; }
-    .markdown-body th, .markdown-body td { border: 1px solid var(--border); padding: 0.6rem; text-align: left; }
-    .markdown-body th { background: var(--bg-secondary); font-weight: 600; }
-    .markdown-body img { max-width: 100%; height: auto; border-radius: 8px; margin: 1.25rem 0; }
+    .markdown-body a {
+      color: var(--primary);
+      text-decoration: none;
+    }
+    .markdown-body a:hover {
+      text-decoration: underline;
+    }
+    .markdown-body hr {
+      border: none;
+      border-top: 2px solid var(--border);
+      margin: 1.5rem 0;
+    }
+    .markdown-body table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1.25rem 0;
+    }
+    .markdown-body th,
+    .markdown-body td {
+      border: 1px solid var(--border);
+      padding: 0.6rem;
+      text-align: left;
+    }
+    .markdown-body th {
+      background: var(--bg-secondary);
+      font-weight: 600;
+    }
+    .markdown-body img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 8px;
+      margin: 1.25rem 0;
+    }
 
     @media (max-width: 1200px) {
-      .editor-layout { grid-template-columns: 240px 1fr 220px; }
+      .editor-layout {
+        grid-template-columns: 240px 1fr 220px;
+      }
     }
 
     @media (max-width: 900px) {
-      .editor-layout { grid-template-columns: 1fr; }
-      .topics-sidebar, .hi-panel { display: none; }
+      .editor-layout {
+        grid-template-columns: 1fr;
+      }
+      .topics-sidebar,
+      .hi-panel {
+        display: none;
+      }
     }
   </style>
 
-  <script define:vars={{ draftId: String(draft._id), topics: topics.map(t => ({ id: t.id, title: t.title, content: t.content })), isBilingual, hiTopicContents, wasPublished: !!draft.publishedAt, userRole: payload.role }}>
+  <script
+    define:vars={{
+      draftId: String(draft._id),
+      topics: topics.map((t) => ({
+        id: t.id,
+        title: t.title,
+        content: t.content,
+      })),
+      isBilingual,
+      hiTopicContents,
+      wasPublished: !!draft.publishedAt,
+      userRole: payload.role,
+    }}
+  >
     let currentTopicId = topics[0]?.id;
-    let currentView = 'edit';
-    let currentLang = 'en'; // 'en' or 'hi'
-    let sidebarLang = 'en'; // Sidebar language
+    let currentView = "edit";
+    let currentLang = "en"; // 'en' or 'hi'
+    let sidebarLang = "en"; // Sidebar language
     let saveTimeout;
 
     // Switch sidebar language
-    window.switchSidebarLang = function(lang) {
+    window.switchSidebarLang = function (lang) {
       sidebarLang = lang;
-      const enList = document.getElementById('topics-list');
-      const hiList = document.getElementById('hi-topics-list');
-      const btnEn = document.getElementById('sidebar-btn-en');
-      const btnHi = document.getElementById('sidebar-btn-hi');
+      const enList = document.getElementById("topics-list");
+      const hiList = document.getElementById("hi-topics-list");
+      const btnEn = document.getElementById("sidebar-btn-en");
+      const btnHi = document.getElementById("sidebar-btn-hi");
 
-      if (lang === 'hi') {
-        if (enList) enList.style.display = 'none';
-        if (hiList) hiList.style.display = 'block';
-        btnEn?.classList.remove('active');
-        btnHi?.classList.add('active');
+      if (lang === "hi") {
+        if (enList) enList.style.display = "none";
+        if (hiList) hiList.style.display = "block";
+        btnEn?.classList.remove("active");
+        btnHi?.classList.add("active");
       } else {
-        if (enList) enList.style.display = 'block';
-        if (hiList) hiList.style.display = 'none';
-        btnEn?.classList.add('active');
-        btnHi?.classList.remove('active');
+        if (enList) enList.style.display = "block";
+        if (hiList) hiList.style.display = "none";
+        btnEn?.classList.add("active");
+        btnHi?.classList.remove("active");
       }
     };
 
@@ -1177,92 +1424,143 @@ if (isBilingual) {
     function selectTopic(topicId, lang) {
       currentTopicId = topicId;
       currentLang = lang || currentLang;
-      const idx = topics.findIndex(t => t.id === topicId);
+      const idx = topics.findIndex((t) => t.id === topicId);
       const topic = topics[idx];
       if (!topic) return;
 
-      const content = currentLang === 'hi' ? (hiTopicContents[idx] || '') : topic.content;
+      const content =
+        currentLang === "hi" ? hiTopicContents[idx] || "" : topic.content;
 
-      document.getElementById('active-topic-title').textContent =
-        currentLang === 'hi' ? (hiTopicContents[idx] ? topic.title + ' (HI)' : topic.title) : topic.title;
-      document.getElementById('md-editor').value = content;
+      document.getElementById("active-topic-title").textContent =
+        currentLang === "hi"
+          ? hiTopicContents[idx]
+            ? topic.title + " (HI)"
+            : topic.title
+          : topic.title;
+      document.getElementById("md-editor").value = content;
       updateHighlight();
 
       // Sync active state on both sidebars
-      document.querySelectorAll('.topic-item:not(.hi-topic-item)').forEach(el => {
-        el.classList.toggle('active', el.dataset.id === topicId && currentLang === 'en');
-      });
-      document.querySelectorAll('.hi-topic-item').forEach(el => {
-        el.classList.toggle('active', el.dataset.id === topicId && currentLang === 'hi');
+      document
+        .querySelectorAll(".topic-item:not(.hi-topic-item)")
+        .forEach((el) => {
+          el.classList.toggle(
+            "active",
+            el.dataset.id === topicId && currentLang === "en",
+          );
+        });
+      document.querySelectorAll(".hi-topic-item").forEach((el) => {
+        el.classList.toggle(
+          "active",
+          el.dataset.id === topicId && currentLang === "hi",
+        );
       });
 
-      if (currentView === 'preview') renderPreview();
+      if (currentView === "preview") renderPreview();
     }
 
     // View toggle
     function setView(view) {
       currentView = view;
-      document.getElementById('btn-edit').classList.toggle('active', view === 'edit');
-      document.getElementById('btn-preview').classList.toggle('active', view === 'preview');
-      document.getElementById('toolbar').style.display = view === 'edit' ? 'flex' : 'none';
-      document.getElementById('md-editor-wrapper').style.display = view === 'edit' ? 'flex' : 'none';
-      document.getElementById('md-preview').style.display = view === 'preview' ? 'block' : 'none';
-      if (view === 'preview') renderPreview();
+      document
+        .getElementById("btn-edit")
+        .classList.toggle("active", view === "edit");
+      document
+        .getElementById("btn-preview")
+        .classList.toggle("active", view === "preview");
+      document.getElementById("toolbar").style.display =
+        view === "edit" ? "flex" : "none";
+      document.getElementById("md-editor-wrapper").style.display =
+        view === "edit" ? "flex" : "none";
+      document.getElementById("md-preview").style.display =
+        view === "preview" ? "block" : "none";
+      if (view === "preview") renderPreview();
     }
 
     async function renderPreview() {
-      const idx = topics.findIndex(t => t.id === currentTopicId);
+      const idx = topics.findIndex((t) => t.id === currentTopicId);
       const topic = topics[idx];
       if (!topic) return;
 
-      const content = currentLang === 'hi'
-        ? (hiTopicContents[idx] || topic.content)
-        : topic.content;
+      const content =
+        currentLang === "hi"
+          ? hiTopicContents[idx] || topic.content
+          : topic.content;
 
-      const res = await fetch('/api/docs/render-topic', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const res = await fetch("/api/docs/render-topic", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content }),
       });
       const data = await res.json();
       if (data.html) {
-        const el = document.getElementById('md-preview');
+        const el = document.getElementById("md-preview");
         if (el) el.innerHTML = data.html;
       }
     }
 
     // Toolbar formatting
     function fmt(type) {
-      const editor = document.getElementById('md-editor');
+      const editor = document.getElementById("md-editor");
       const start = editor.selectionStart;
       const end = editor.selectionEnd;
       const selected = editor.value.substring(start, end);
-      let replacement = '';
+      let replacement = "";
 
-      switch(type) {
-        case 'h2': replacement = '## ' + (selected || 'Heading'); break;
-        case 'h3': replacement = '### ' + (selected || 'Heading'); break;
-        case 'bold': replacement = '**' + (selected || 'bold text') + '**'; break;
-        case 'italic': replacement = '*' + (selected || 'italic text') + '*'; break;
-        case 'underline': replacement = '++' + (selected || 'underline text') + '++'; break;
-        case 'code': replacement = '`' + (selected || 'code') + '`'; break;
-        case 'highlight': replacement = '==' + (selected || 'highlighted text') + '=='; break;
-        case 'color-accent': replacement = '{accent:' + (selected || 'text') + '}'; break;
-        case 'codeblock': replacement = '\n```javascript\n' + (selected || 'code here') + '\n```\n'; break;
-        case 'ul': replacement = '- ' + (selected || 'list item'); break;
-        case 'ol': replacement = '1. ' + (selected || 'list item'); break;
-        case 'blockquote': replacement = '> ' + (selected || 'quote'); break;
-        case 'hr': replacement = '\n---\n'; break;
+      switch (type) {
+        case "h2":
+          replacement = "## " + (selected || "Heading");
+          break;
+        case "h3":
+          replacement = "### " + (selected || "Heading");
+          break;
+        case "bold":
+          replacement = "**" + (selected || "bold text") + "**";
+          break;
+        case "italic":
+          replacement = "*" + (selected || "italic text") + "*";
+          break;
+        case "underline":
+          replacement = "++" + (selected || "underline text") + "++";
+          break;
+        case "code":
+          replacement = "`" + (selected || "code") + "`";
+          break;
+        case "highlight":
+          replacement = "==" + (selected || "highlighted text") + "==";
+          break;
+        case "color-accent":
+          replacement = "{accent:" + (selected || "text") + "}";
+          break;
+        case "codeblock":
+          replacement =
+            "\n```javascript\n" + (selected || "code here") + "\n```\n";
+          break;
+        case "ul":
+          replacement = "- " + (selected || "list item");
+          break;
+        case "ol":
+          replacement = "1. " + (selected || "list item");
+          break;
+        case "blockquote":
+          replacement = "> " + (selected || "quote");
+          break;
+        case "hr":
+          replacement = "\n---\n";
+          break;
       }
 
-      editor.value = editor.value.substring(0, start) + replacement + editor.value.substring(end);
+      editor.value =
+        editor.value.substring(0, start) +
+        replacement +
+        editor.value.substring(end);
       editor.focus();
       editor.setSelectionRange(start, start + replacement.length);
       autoSave();
     }
 
     // Auto-save on edit
-    document.getElementById('md-editor').addEventListener('input', () => {
+    document.getElementById("md-editor").addEventListener("input", () => {
       autoSave();
       updateHighlight();
     });
@@ -1270,332 +1568,415 @@ if (isBilingual) {
     function autoSave() {
       clearTimeout(saveTimeout);
       saveTimeout = setTimeout(() => {
-        const topic = topics.find(t => t.id === currentTopicId);
+        const topic = topics.find((t) => t.id === currentTopicId);
         if (topic) {
-          topic.content = document.getElementById('md-editor').value;
+          topic.content = document.getElementById("md-editor").value;
         }
       }, 1000);
     }
 
     // Live syntax highlighting in editor
     function updateHighlight() {
-      const editor = document.getElementById('md-editor');
-      const highlight = document.getElementById('md-highlight');
+      const editor = document.getElementById("md-editor");
+      const highlight = document.getElementById("md-highlight");
       if (!editor || !highlight) return;
 
       // Escape HTML first to prevent injection
       let text = editor.value
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;');
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
 
       // Highlight ==text== with yellow background
-      text = text.replace(/==(.*?)==/g, '<mark>$1</mark>');
+      text = text.replace(/==(.*?)==/g, "<mark>$1</mark>");
 
       // Highlight {accent:text} with theme color
-      text = text.replace(/\{accent:(.*?)\}/g, '<span class="accent-text">$1</span>');
+      text = text.replace(
+        /\{accent:(.*?)\}/g,
+        '<span class="accent-text">$1</span>',
+      );
 
       highlight.innerHTML = text;
       highlight.scrollTop = editor.scrollTop;
     }
 
     // Sync scroll between editor and highlight layer
-    document.getElementById('md-editor').addEventListener('scroll', (e) => {
-      const highlight = document.getElementById('md-highlight');
+    document.getElementById("md-editor").addEventListener("scroll", (e) => {
+      const highlight = document.getElementById("md-highlight");
       if (highlight) highlight.scrollTop = e.target.scrollTop;
     });
 
     // Event delegation for topic list (EN side)
-    document.getElementById('topics-list').addEventListener('click', (e) => {
-      const topicItem = e.target.closest('.topic-item');
+    document.getElementById("topics-list").addEventListener("click", (e) => {
+      const topicItem = e.target.closest(".topic-item");
       if (!topicItem) return;
       const topicId = topicItem.dataset.id;
-      if (e.target.classList.contains('btn-delete')) {
+      if (e.target.classList.contains("btn-delete")) {
         deleteTopic(topicId);
       } else {
-        selectTopic(topicId, 'en');
+        selectTopic(topicId, "en");
       }
     });
 
     // Drag and drop for topics
-    document.getElementById('topics-list').addEventListener('dragstart', (e) => {
-      if (e.target.classList.contains('topic-item')) {
-        e.target.classList.add('dragging');
-      }
-    });
+    document
+      .getElementById("topics-list")
+      .addEventListener("dragstart", (e) => {
+        if (e.target.classList.contains("topic-item")) {
+          e.target.classList.add("dragging");
+        }
+      });
 
-    document.getElementById('topics-list').addEventListener('dragend', (e) => {
-      if (e.target.classList.contains('topic-item')) {
-        e.target.classList.remove('dragging');
-        document.querySelectorAll('.topic-item').forEach(item => {
-          item.classList.remove('drag-over');
+    document.getElementById("topics-list").addEventListener("dragend", (e) => {
+      if (e.target.classList.contains("topic-item")) {
+        e.target.classList.remove("dragging");
+        document.querySelectorAll(".topic-item").forEach((item) => {
+          item.classList.remove("drag-over");
         });
       }
     });
 
-    document.getElementById('topics-list').addEventListener('dragover', (e) => {
+    document.getElementById("topics-list").addEventListener("dragover", (e) => {
       e.preventDefault();
       const afterElement = getDragAfterElement(e.clientY);
-      const draggable = document.querySelector('.dragging');
-      
+      const draggable = document.querySelector(".dragging");
+
       if (afterElement == null) {
-        document.getElementById('topics-list').appendChild(draggable);
+        document.getElementById("topics-list").appendChild(draggable);
       } else {
-        document.getElementById('topics-list').insertBefore(draggable, afterElement);
+        document
+          .getElementById("topics-list")
+          .insertBefore(draggable, afterElement);
       }
     });
 
-    document.getElementById('topics-list').addEventListener('drop', async (e) => {
-      e.preventDefault();
-      
-      // Get new order
-      const items = Array.from(document.querySelectorAll('.topic-item:not(.hi-topic-item)'));
-      const newOrder = items.map(item => item.dataset.id);
-      
-      // Update topics array order
-      const reordered = newOrder.map((id, index) => {
-        const topic = topics.find(t => t.id === id);
-        return { ...topic, order: index };
-      });
-      
-      // Save to server
-      await fetch('/api/docs/reorder-topics', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ draftId, topicIds: newOrder }),
-      });
-      
-      // Update local topics array
-      topics.length = 0;
-      topics.push(...reordered);
+    document
+      .getElementById("topics-list")
+      .addEventListener("drop", async (e) => {
+        e.preventDefault();
 
-      // Sync HI sidebar order
-      syncHiSidebar(newOrder);
-    });
+        // Get new order
+        const items = Array.from(
+          document.querySelectorAll(".topic-item:not(.hi-topic-item)"),
+        );
+        const newOrder = items.map((item) => item.dataset.id);
+
+        // Update topics array order
+        const reordered = newOrder.map((id, index) => {
+          const topic = topics.find((t) => t.id === id);
+          return { ...topic, order: index };
+        });
+
+        // Save to server
+        await fetch("/api/docs/reorder-topics", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ draftId, topicIds: newOrder }),
+        });
+
+        // Update local topics array
+        topics.length = 0;
+        topics.push(...reordered);
+
+        // Sync HI sidebar order
+        syncHiSidebar(newOrder);
+      });
 
     function getDragAfterElement(y) {
-      const draggableElements = [...document.querySelectorAll('.topic-item:not(.dragging)')];
-      
-      return draggableElements.reduce((closest, child) => {
-        const box = child.getBoundingClientRect();
-        const offset = y - box.top - box.height / 2;
-        
-        if (offset < 0 && offset > closest.offset) {
-          return { offset: offset, element: child };
-        } else {
-          return closest;
-        }
-      }, { offset: Number.NEGATIVE_INFINITY }).element;
+      const draggableElements = [
+        ...document.querySelectorAll(".topic-item:not(.dragging)"),
+      ];
+
+      return draggableElements.reduce(
+        (closest, child) => {
+          const box = child.getBoundingClientRect();
+          const offset = y - box.top - box.height / 2;
+
+          if (offset < 0 && offset > closest.offset) {
+            return { offset: offset, element: child };
+          } else {
+            return closest;
+          }
+        },
+        { offset: Number.NEGATIVE_INFINITY },
+      ).element;
     }
 
     // Sync HI sidebar when EN is reordered
     function syncHiSidebar(newOrder) {
-      const hiList = document.getElementById('hi-topics-list');
+      const hiList = document.getElementById("hi-topics-list");
       if (!hiList) return;
-      const hiItems = Array.from(hiList.querySelectorAll('.hi-topic-item'));
+      const hiItems = Array.from(hiList.querySelectorAll(".hi-topic-item"));
       const itemMap = {};
-      hiItems.forEach(item => { itemMap[item.dataset.id] = item; });
-      newOrder.forEach(id => {
+      hiItems.forEach((item) => {
+        itemMap[item.dataset.id] = item;
+      });
+      newOrder.forEach((id) => {
         if (itemMap[id]) hiList.appendChild(itemMap[id]);
       });
     }
 
     // HI topic click — loads HI content in center
-    const hiTopicsList = document.getElementById('hi-topics-list');
+    const hiTopicsList = document.getElementById("hi-topics-list");
     if (hiTopicsList) {
-      hiTopicsList.addEventListener('click', (e) => {
-        const item = e.target.closest('.hi-topic-item');
+      hiTopicsList.addEventListener("click", (e) => {
+        const item = e.target.closest(".hi-topic-item");
         if (!item) return;
-        selectTopic(item.dataset.id, 'hi');
+        selectTopic(item.dataset.id, "hi");
       });
     }
 
-    document.getElementById('toolbar').addEventListener('click', (e) => {
-      if (e.target.classList.contains('tool-btn')) {
+    document.getElementById("toolbar").addEventListener("click", (e) => {
+      if (e.target.classList.contains("tool-btn")) {
         const fmtType = e.target.dataset.fmt;
         if (fmtType) fmt(fmtType);
       }
     });
 
     // View toggle buttons
-    document.getElementById('btn-edit').addEventListener('click', () => setView('edit'));
-    document.getElementById('btn-preview').addEventListener('click', () => setView('preview'));
+    document
+      .getElementById("btn-edit")
+      .addEventListener("click", () => setView("edit"));
+    document
+      .getElementById("btn-preview")
+      .addEventListener("click", () => setView("preview"));
 
     // Save button
-    document.getElementById('save-btn').addEventListener('click', async () => {
-      const btn = document.getElementById('save-btn');
+    document.getElementById("save-btn").addEventListener("click", async () => {
+      const btn = document.getElementById("save-btn");
       btn.disabled = true;
-      btn.textContent = 'Saving...';
+      btn.textContent = "Saving...";
 
-      const fullContent = topics.map(t => t.content).join('\n\n');
-      const description = document.getElementById('meta-desc').value;
-      const tags = document.getElementById('meta-tags').value.split(',').map(t => t.trim()).filter(Boolean);
-      const category = document.getElementById('meta-category').value;
+      const fullContent = topics.map((t) => t.content).join("\n\n");
+      const description = document.getElementById("meta-desc").value;
+      const tags = document
+        .getElementById("meta-tags")
+        .value.split(",")
+        .map((t) => t.trim())
+        .filter(Boolean);
+      const category = document.getElementById("meta-category").value;
 
-      const res = await fetch('/api/docs/update', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ draftId, topics, content: fullContent, description, tags, category }),
+      const res = await fetch("/api/docs/update", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          draftId,
+          topics,
+          content: fullContent,
+          description,
+          tags,
+          category,
+        }),
       });
 
       const data = await res.json();
       if (data.success) {
-        btn.textContent = 'Saved';
+        btn.textContent = "Saved";
 
         // If doc was auto-unpublished (was approved, now draft), swap UI
-        if (data.wasUnpublished && userRole === 'super_admin') {
-          const badge = document.getElementById('status-badge');
+        if (data.wasUnpublished && userRole === "super_admin") {
+          const badge = document.getElementById("status-badge");
           if (badge) {
-            const republishBtn = document.createElement('button');
-            republishBtn.id = 'admin-publish-btn';
-            republishBtn.className = 'btn-republish';
-            republishBtn.textContent = 'Republish';
+            const republishBtn = document.createElement("button");
+            republishBtn.id = "admin-publish-btn";
+            republishBtn.className = "btn-republish";
+            republishBtn.textContent = "Republish";
             badge.replaceWith(republishBtn);
             attachAdminPublish(republishBtn);
           }
         }
 
-        setTimeout(() => { btn.textContent = 'Save'; btn.disabled = false; }, 1500);
+        setTimeout(() => {
+          btn.textContent = "Save";
+          btn.disabled = false;
+        }, 1500);
       } else {
-        await Dialog.alert('Error saving: ' + data.error, 'error');
-        btn.textContent = 'Save';
+        await Dialog.alert("Error saving: " + data.error, "error");
+        btn.textContent = "Save";
         btn.disabled = false;
       }
     });
 
     // Submit for review
-    const submitBtn = document.getElementById('submit-btn');
+    const submitBtn = document.getElementById("submit-btn");
     if (submitBtn) {
-      submitBtn.addEventListener('click', async () => {
-        if (!await Dialog.confirm('Submit this documentation for admin review?', 'warn', 'Submit')) return;
+      submitBtn.addEventListener("click", async () => {
+        if (
+          !(await Dialog.confirm(
+            "Submit this documentation for admin review?",
+            "warn",
+            "Submit",
+          ))
+        )
+          return;
         submitBtn.disabled = true;
-        submitBtn.textContent = 'Submitting...';
+        submitBtn.textContent = "Submitting...";
 
-        const res = await fetch('/api/docs/update', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ draftId, status: 'pending_review' }),
+        const res = await fetch("/api/docs/update", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ draftId, status: "pending_review" }),
         });
 
         const data = await res.json();
         if (data.success) {
-          await Dialog.alert('Submitted for review!', 'info');
-          window.location.href = '/instructor/dashboard';
+          await Dialog.alert("Submitted for review!", "info");
+          window.location.href = "/instructor/dashboard";
         } else {
-          await Dialog.alert('Error: ' + data.error, 'error');
+          await Dialog.alert("Error: " + data.error, "error");
           submitBtn.disabled = false;
-          submitBtn.textContent = 'Submit for Review';
+          submitBtn.textContent = "Submit for Review";
         }
       });
     }
 
     // Republish changes
-    const republishBtn = document.getElementById('republish-btn');
+    const republishBtn = document.getElementById("republish-btn");
     if (republishBtn) {
-      republishBtn.addEventListener('click', async () => {
-        if (!await Dialog.confirm('Submit changes for admin review? The doc will need admin approval before being republished.', 'warn', 'Submit')) return;
+      republishBtn.addEventListener("click", async () => {
+        if (
+          !(await Dialog.confirm(
+            "Submit changes for admin review? The doc will need admin approval before being republished.",
+            "warn",
+            "Submit",
+          ))
+        )
+          return;
         republishBtn.disabled = true;
-        republishBtn.textContent = 'Submitting...';
+        republishBtn.textContent = "Submitting...";
 
-        const fullContent = topics.map(t => t.content).join('\n\n');
-        const description = document.getElementById('meta-desc').value;
-        const tags = document.getElementById('meta-tags').value.split(',').map(t => t.trim()).filter(Boolean);
-        const category = document.getElementById('meta-category').value;
+        const fullContent = topics.map((t) => t.content).join("\n\n");
+        const description = document.getElementById("meta-desc").value;
+        const tags = document
+          .getElementById("meta-tags")
+          .value.split(",")
+          .map((t) => t.trim())
+          .filter(Boolean);
+        const category = document.getElementById("meta-category").value;
 
-        const saveRes = await fetch('/api/docs/update', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ draftId, topics, content: fullContent, description, tags, category }),
+        const saveRes = await fetch("/api/docs/update", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            draftId,
+            topics,
+            content: fullContent,
+            description,
+            tags,
+            category,
+          }),
         });
 
         const saveData = await saveRes.json();
         if (!saveData.success) {
-          await Dialog.alert('Error saving: ' + saveData.error, 'error');
+          await Dialog.alert("Error saving: " + saveData.error, "error");
           republishBtn.disabled = false;
-          republishBtn.textContent = 'Republish Changes';
+          republishBtn.textContent = "Republish Changes";
           return;
         }
 
-        const res = await fetch('/api/docs/update', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ draftId, status: 'pending_review' }),
+        const res = await fetch("/api/docs/update", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ draftId, status: "pending_review" }),
         });
 
         const data = await res.json();
         if (data.success) {
-          await Dialog.alert('Changes submitted for admin review!', 'info');
-          window.location.href = '/instructor/dashboard';
+          await Dialog.alert("Changes submitted for admin review!", "info");
+          window.location.href = "/instructor/dashboard";
         } else {
-          await Dialog.alert('Error: ' + data.error, 'error');
+          await Dialog.alert("Error: " + data.error, "error");
           republishBtn.disabled = false;
-          republishBtn.textContent = 'Republish Changes';
+          republishBtn.textContent = "Republish Changes";
         }
       });
     }
 
     // ─── Admin Direct Publish / Republish ───────────────────
     function attachAdminPublish(btnEl) {
-      btnEl.addEventListener('click', async () => {
+      btnEl.addEventListener("click", async () => {
         const isRepublish = wasPublished;
         const confirmMsg = isRepublish
-          ? 'Republish this document? CloudFront will be invalidated for this page.'
-          : 'Publish this document? It will appear on the public site.';
+          ? "Republish this document? CloudFront will be invalidated for this page."
+          : "Publish this document? It will appear on the public site.";
 
-        if (!await Dialog.confirm(confirmMsg, 'warn', isRepublish ? 'Republish' : 'Publish')) return;
+        if (
+          !(await Dialog.confirm(
+            confirmMsg,
+            "warn",
+            isRepublish ? "Republish" : "Publish",
+          ))
+        )
+          return;
 
         btnEl.disabled = true;
-        btnEl.textContent = isRepublish ? 'Republishing...' : 'Publishing...';
+        btnEl.textContent = isRepublish ? "Republishing..." : "Publishing...";
 
         // Save content first
-        const fullContent = topics.map(t => t.content).join('\n\n');
-        const description = document.getElementById('meta-desc').value;
-        const tags = document.getElementById('meta-tags').value.split(',').map(t => t.trim()).filter(Boolean);
-        const category = document.getElementById('meta-category').value;
+        const fullContent = topics.map((t) => t.content).join("\n\n");
+        const description = document.getElementById("meta-desc").value;
+        const tags = document
+          .getElementById("meta-tags")
+          .value.split(",")
+          .map((t) => t.trim())
+          .filter(Boolean);
+        const category = document.getElementById("meta-category").value;
 
-        const saveRes = await fetch('/api/docs/update', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ draftId, topics, content: fullContent, description, tags, category }),
+        const saveRes = await fetch("/api/docs/update", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            draftId,
+            topics,
+            content: fullContent,
+            description,
+            tags,
+            category,
+          }),
         });
         const saveData = await saveRes.json();
         if (!saveData.success) {
-          await Dialog.alert('Error saving: ' + saveData.error, 'error');
+          await Dialog.alert("Error saving: " + saveData.error, "error");
           btnEl.disabled = false;
-          btnEl.textContent = isRepublish ? 'Republish' : 'Publish';
+          btnEl.textContent = isRepublish ? "Republish" : "Publish";
           return;
         }
 
         // Publish directly via admin API
-        const res = await fetch('/api/admin/publish', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+        const res = await fetch("/api/admin/publish", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ draftId }),
         });
         const data = await res.json();
         if (data.success) {
-          await Dialog.alert(data.message || 'Published!', 'info');
+          await Dialog.alert(data.message || "Published!", "info");
           window.location.reload();
         } else {
-          await Dialog.alert('Error: ' + data.error, 'error');
+          await Dialog.alert("Error: " + data.error, "error");
           btnEl.disabled = false;
-          btnEl.textContent = isRepublish ? 'Republish' : 'Publish';
+          btnEl.textContent = isRepublish ? "Republish" : "Publish";
         }
       });
     }
 
     // Attach to admin publish button if present on page load
-    const existingAdminBtn = document.getElementById('admin-publish-btn');
+    const existingAdminBtn = document.getElementById("admin-publish-btn");
     if (existingAdminBtn) attachAdminPublish(existingAdminBtn);
 
     // Delete topic
     async function deleteTopic(topicId) {
-      if (topics.length === 1) { await Dialog.alert('Cannot delete the last topic', 'warn'); return; }
-      if (!await Dialog.confirm('Delete this topic?', 'warn', 'Delete', true)) return;
+      if (topics.length === 1) {
+        await Dialog.alert("Cannot delete the last topic", "warn");
+        return;
+      }
+      if (!(await Dialog.confirm("Delete this topic?", "warn", "Delete", true)))
+        return;
 
-      await fetch('/api/docs/delete-topic', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
+      await fetch("/api/docs/delete-topic", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ draftId, topicId }),
       });
 
@@ -1603,103 +1984,119 @@ if (isBilingual) {
     }
 
     // Metadata overlay
-    document.getElementById('meta-open-btn').addEventListener('click', () => {
-      document.getElementById('meta-overlay').style.display = 'flex';
+    document.getElementById("meta-open-btn").addEventListener("click", () => {
+      document.getElementById("meta-overlay").style.display = "flex";
     });
-    document.getElementById('meta-close-btn').addEventListener('click', () => {
-      document.getElementById('meta-overlay').style.display = 'none';
+    document.getElementById("meta-close-btn").addEventListener("click", () => {
+      document.getElementById("meta-overlay").style.display = "none";
     });
-    document.getElementById('meta-overlay').addEventListener('click', (e) => {
-      if (e.target === document.getElementById('meta-overlay')) {
-        document.getElementById('meta-overlay').style.display = 'none';
+    document.getElementById("meta-overlay").addEventListener("click", (e) => {
+      if (e.target === document.getElementById("meta-overlay")) {
+        document.getElementById("meta-overlay").style.display = "none";
       }
     });
-    document.getElementById('meta-save-btn').addEventListener('click', async () => {
-      const btn = document.getElementById('meta-save-btn');
-      btn.textContent = 'Saving...';
-      btn.disabled = true;
+    document
+      .getElementById("meta-save-btn")
+      .addEventListener("click", async () => {
+        const btn = document.getElementById("meta-save-btn");
+        btn.textContent = "Saving...";
+        btn.disabled = true;
 
-      const description = document.getElementById('meta-desc').value;
-      const tags = document.getElementById('meta-tags').value.split(',').map(t => t.trim()).filter(Boolean);
-      const category = document.getElementById('meta-category').value;
+        const description = document.getElementById("meta-desc").value;
+        const tags = document
+          .getElementById("meta-tags")
+          .value.split(",")
+          .map((t) => t.trim())
+          .filter(Boolean);
+        const category = document.getElementById("meta-category").value;
 
-      const res = await fetch('/api/docs/update', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ draftId, description, tags, category }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        btn.textContent = 'Saved';
-        setTimeout(() => {
-          btn.textContent = 'Save Metadata';
+        const res = await fetch("/api/docs/update", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ draftId, description, tags, category }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          btn.textContent = "Saved";
+          setTimeout(() => {
+            btn.textContent = "Save Metadata";
+            btn.disabled = false;
+            document.getElementById("meta-overlay").style.display = "none";
+          }, 1000);
+        } else {
+          await Dialog.alert("Error: " + data.error, "error");
+          btn.textContent = "Save Metadata";
           btn.disabled = false;
-          document.getElementById('meta-overlay').style.display = 'none';
-        }, 1000);
-      } else {
-        await Dialog.alert('Error: ' + data.error, 'error');
-        btn.textContent = 'Save Metadata';
-        btn.disabled = false;
-      }
-    });
-    document.getElementById('add-topic-btn').addEventListener('click', () => {
-      document.getElementById('add-modal').style.display = 'flex';
-      document.getElementById('new-topic-title').value = '';
-      document.getElementById('new-topic-title').focus();
+        }
+      });
+    document.getElementById("add-topic-btn").addEventListener("click", () => {
+      document.getElementById("add-modal").style.display = "flex";
+      document.getElementById("new-topic-title").value = "";
+      document.getElementById("new-topic-title").focus();
     });
 
-    document.getElementById('cancel-add-topic').addEventListener('click', () => {
-      document.getElementById('add-modal').style.display = 'none';
-    });
-
-    document.getElementById('confirm-add-topic').addEventListener('click', async () => {
-      const title = document.getElementById('new-topic-title').value.trim();
-      if (!title) return;
-
-      const res = await fetch('/api/docs/add-topic', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ draftId, title, content: `## ${title}\n\nStart writing here...` }),
+    document
+      .getElementById("cancel-add-topic")
+      .addEventListener("click", () => {
+        document.getElementById("add-modal").style.display = "none";
       });
 
-      const data = await res.json();
-      if (data.success) {
-        location.reload();
-      } else {
-        await Dialog.alert('Error: ' + data.error, 'error');
-      }
-    });
+    document
+      .getElementById("confirm-add-topic")
+      .addEventListener("click", async () => {
+        const title = document.getElementById("new-topic-title").value.trim();
+        if (!title) return;
+
+        const res = await fetch("/api/docs/add-topic", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            draftId,
+            title,
+            content: `## ${title}\n\nStart writing here...`,
+          }),
+        });
+
+        const data = await res.json();
+        if (data.success) {
+          location.reload();
+        } else {
+          await Dialog.alert("Error: " + data.error, "error");
+        }
+      });
 
     // Upload topic from file
-    const topicFileInput = document.getElementById('topic-file-input');
-    
-    document.getElementById('upload-topic-btn').addEventListener('click', () => {
-      topicFileInput.click();
-    });
+    const topicFileInput = document.getElementById("topic-file-input");
 
-    topicFileInput.addEventListener('change', async (e) => {
+    document
+      .getElementById("upload-topic-btn")
+      .addEventListener("click", () => {
+        topicFileInput.click();
+      });
+
+    topicFileInput.addEventListener("change", async (e) => {
       const file = e.target.files?.[0];
       if (!file) return;
 
       if (!file.name.match(/\.(md|markdown)$/i)) {
-        await Dialog.alert('Please upload a .md or .markdown file', 'warn');
+        await Dialog.alert("Please upload a .md or .markdown file", "warn");
         return;
       }
 
       const reader = new FileReader();
       reader.onload = async (event) => {
         const content = event.target.result;
-        
+
         // Extract title from filename
         const title = file.name
-          .replace(/\.(md|markdown)$/i, '')
-          .replace(/[-_]/g, ' ')
-          .replace(/\b\w/g, c => c.toUpperCase());
+          .replace(/\.(md|markdown)$/i, "")
+          .replace(/[-_]/g, " ")
+          .replace(/\b\w/g, (c) => c.toUpperCase());
 
         // Add the topic
-        const res = await fetch('/api/docs/add-topic', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+        const res = await fetch("/api/docs/add-topic", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ draftId, title, content }),
         });
 
@@ -1707,27 +2104,27 @@ if (isBilingual) {
         if (data.success) {
           location.reload();
         } else {
-          await Dialog.alert('Error: ' + data.error, 'error');
+          await Dialog.alert("Error: " + data.error, "error");
         }
       };
-      
+
       reader.readAsText(file);
-      
+
       // Reset input so same file can be uploaded again
-      topicFileInput.value = '';
+      topicFileInput.value = "";
     });
 
     // Init
-    if (topics.length > 0) selectTopic(topics[0].id, 'en');
+    if (topics.length > 0) selectTopic(topics[0].id, "en");
 
     // AI Assistant Chat
-    const aiChatMessages = document.getElementById('ai-chat-messages');
-    const aiChatInput = document.getElementById('ai-chat-input');
-    const aiSendBtn = document.getElementById('ai-send-btn');
+    const aiChatMessages = document.getElementById("ai-chat-messages");
+    const aiChatInput = document.getElementById("ai-chat-input");
+    const aiSendBtn = document.getElementById("ai-send-btn");
 
-    aiSendBtn.addEventListener('click', sendAIMessage);
-    aiChatInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
+    aiSendBtn.addEventListener("click", sendAIMessage);
+    aiChatInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
         sendAIMessage();
       }
@@ -1738,20 +2135,20 @@ if (isBilingual) {
       if (!message) return;
 
       // Add user message
-      addAIMessage('user', message);
-      aiChatInput.value = '';
+      addAIMessage("user", message);
+      aiChatInput.value = "";
       aiSendBtn.disabled = true;
 
       // Add loading message
-      const loadingMsg = addAIMessage('assistant', '', true);
+      const loadingMsg = addAIMessage("assistant", "", true);
 
       try {
         // Get current topic content
-        const currentTopic = topics.find(t => t.id === currentTopicId);
-        const currentContent = currentTopic ? currentTopic.content : '';
+        const currentTopic = topics.find((t) => t.id === currentTopicId);
+        const currentContent = currentTopic ? currentTopic.content : "";
 
         // Enhanced prompt with context
-        const enhancedPrompt = `Current topic: "${currentTopic?.title || 'Unknown'}"
+        const enhancedPrompt = `Current topic: "${currentTopic?.title || "Unknown"}"
 
 Current content:
 \`\`\`
@@ -1769,9 +2166,9 @@ INSTRUCTIONS:
 
 Generate the requested content:`;
 
-        const res = await fetch('/api/ai/generate-docs', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+        const res = await fetch("/api/ai/generate-docs", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ prompt: enhancedPrompt, chatHistory: [] }),
         });
 
@@ -1780,93 +2177,116 @@ Generate the requested content:`;
 
         if (data.success) {
           const markdown = data.markdown;
-          
+
           // Check if it's a new topic or edit
-          const isNewTopic = message.toLowerCase().includes('new topic') || 
-                            message.toLowerCase().includes('create') ||
-                            message.toLowerCase().includes('add topic');
+          const isNewTopic =
+            message.toLowerCase().includes("new topic") ||
+            message.toLowerCase().includes("create") ||
+            message.toLowerCase().includes("add topic");
 
           if (isNewTopic) {
             // Extract title from markdown
             const titleMatch = markdown.match(/^##\s+(.+)$/m);
-            const newTitle = titleMatch ? titleMatch[1].trim() : 'New Topic';
-            
-            addAIMessage('assistant', `New topic "${newTitle}" created! Click "Apply" to add it.`);
-            
+            const newTitle = titleMatch ? titleMatch[1].trim() : "New Topic";
+
+            addAIMessage(
+              "assistant",
+              `New topic "${newTitle}" created! Click "Apply" to add it.`,
+            );
+
             // Show apply button
-            const applyBtn = document.createElement('button');
-            applyBtn.textContent = 'Apply New Topic';
-            applyBtn.className = 'ai-apply-btn';
+            const applyBtn = document.createElement("button");
+            applyBtn.textContent = "Apply New Topic";
+            applyBtn.className = "ai-apply-btn";
             applyBtn.onclick = async () => {
               applyBtn.disabled = true;
-              applyBtn.textContent = 'Adding...';
-              
-              const res = await fetch('/api/docs/add-topic', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ draftId, title: newTitle, content: markdown }),
+              applyBtn.textContent = "Adding...";
+
+              const res = await fetch("/api/docs/add-topic", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  draftId,
+                  title: newTitle,
+                  content: markdown,
+                }),
               });
               const data = await res.json();
               if (data.success) {
                 applyBtn.remove();
-                addAIMessage('assistant', 'Topic added successfully! Reloading...');
+                addAIMessage(
+                  "assistant",
+                  "Topic added successfully! Reloading...",
+                );
                 setTimeout(() => location.reload(), 1000);
               } else {
                 applyBtn.disabled = false;
-                applyBtn.textContent = 'Apply New Topic';
-                addAIMessage('assistant', 'Failed to add topic. Please try again.');
+                applyBtn.textContent = "Apply New Topic";
+                addAIMessage(
+                  "assistant",
+                  "Failed to add topic. Please try again.",
+                );
               }
             };
             aiChatMessages.appendChild(applyBtn);
           } else {
             // Edit current topic
-            addAIMessage('assistant', 'Content updated! Click "Apply" to save changes.');
-            
+            addAIMessage(
+              "assistant",
+              'Content updated! Click "Apply" to save changes.',
+            );
+
             // Show apply button
-            const applyBtn = document.createElement('button');
-            applyBtn.textContent = 'Apply Changes';
-            applyBtn.className = 'ai-apply-btn';
+            const applyBtn = document.createElement("button");
+            applyBtn.textContent = "Apply Changes";
+            applyBtn.className = "ai-apply-btn";
             applyBtn.onclick = async () => {
               // Apply to editor
-              document.getElementById('md-editor').value = markdown;
+              document.getElementById("md-editor").value = markdown;
               currentTopic.content = markdown;
               updateHighlight();
-              
+
               // Remove the button
               applyBtn.remove();
-              
+
               // Auto-save
-              const fullContent = topics.map(t => t.content).join('\n\n');
-              const saveRes = await fetch('/api/docs/update', {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
+              const fullContent = topics.map((t) => t.content).join("\n\n");
+              const saveRes = await fetch("/api/docs/update", {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ draftId, topics, content: fullContent }),
               });
-              
+
               const saveData = await saveRes.json();
               if (saveData.success) {
-                addAIMessage('assistant', 'Changes applied and saved successfully!');
+                addAIMessage(
+                  "assistant",
+                  "Changes applied and saved successfully!",
+                );
               } else {
-                addAIMessage('assistant', 'Applied to editor but save failed. Please save manually.');
+                addAIMessage(
+                  "assistant",
+                  "Applied to editor but save failed. Please save manually.",
+                );
               }
             };
             aiChatMessages.appendChild(applyBtn);
           }
         } else {
-          addAIMessage('assistant', `Error: ${data.error}`);
+          addAIMessage("assistant", `Error: ${data.error}`);
         }
       } catch (error) {
         loadingMsg.remove();
-        addAIMessage('assistant', `Error: ${error.message}`);
+        addAIMessage("assistant", `Error: ${error.message}`);
       }
 
       aiSendBtn.disabled = false;
     }
 
     function addAIMessage(role, content, loading = false) {
-      const msgDiv = document.createElement('div');
-      msgDiv.className = `ai-message ${role}${loading ? ' loading' : ''}`;
-      
+      const msgDiv = document.createElement("div");
+      msgDiv.className = `ai-message ${role}${loading ? " loading" : ""}`;
+
       if (loading) {
         msgDiv.innerHTML = `
           <div class="ai-message-content">
@@ -1877,9 +2297,9 @@ Generate the requested content:`;
           </div>
         `;
       } else {
-        msgDiv.innerHTML = `<div class="ai-message-content">${content.replace(/\n/g, '<br>')}</div>`;
+        msgDiv.innerHTML = `<div class="ai-message-content">${content.replace(/\n/g, "<br>")}</div>`;
       }
-      
+
       aiChatMessages.appendChild(msgDiv);
       aiChatMessages.scrollTop = aiChatMessages.scrollHeight;
       return msgDiv;

@@ -2,6 +2,8 @@ import type { APIRoute } from 'astro';
 import { verifyToken } from '../../../lib/auth/jwt';
 import { createDocDraft } from '../../../lib/db/docs';
 import { splitMarkdownIntoTopics } from '../../../lib/markdown/splitter';
+import { extractLangBlocks } from '../../../lib/markdown/lang';
+import { topicsToIndex } from '../../../lib/db/models';
 import { uploadMarkdown } from '../../../lib/aws/s3';
 
 export const POST: APIRoute = async ({ request, cookies }) => {
@@ -34,9 +36,20 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       });
     }
     
-    // Split markdown into topics (only if content exists)
-    const topics = content ? splitMarkdownIntoTopics(content) : [];
-    
+    // Upload content to S3 first (primary storage)
+    if (content) {
+      await uploadMarkdown(category, slug, content);
+    }
+
+    // Split into topics — use EN content only for bilingual docs (consistent with editor)
+    let contentToSplit = content || '';
+    if (content) {
+      const { en, hi } = extractLangBlocks(content);
+      if (hi) contentToSplit = en; // bilingual: split only EN part
+    }
+    const topics = contentToSplit ? splitMarkdownIntoTopics(contentToSplit) : [];
+
+    // MongoDB stores only metadata + topic index (no content)
     const draft = await createDocDraft({
       instructorId: payload.userId,
       instructorEmail: payload.email,
@@ -44,19 +57,9 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       title,
       slug,
       description: description || '',
-      content: content || '',
-      topics,
+      topics: topicsToIndex(topics),
       tags: tags || [],
     });
-
-    // Sync markdown content to S3 for durable storage
-    if (content) {
-      try {
-        await uploadMarkdown(category, slug, content);
-      } catch (s3Err) {
-        console.error('S3 upload failed (non-blocking):', s3Err);
-      }
-    }
     
     return new Response(JSON.stringify({ success: true, draft }), {
       status: 201,

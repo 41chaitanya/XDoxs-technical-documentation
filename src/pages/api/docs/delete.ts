@@ -1,7 +1,7 @@
 import type { APIRoute } from 'astro';
 import { verifyToken } from '../../../lib/auth/jwt';
 import { deleteDocDraft, getDocDraft } from '../../../lib/db/docs';
-import { deleteMarkdown } from '../../../lib/aws/s3';
+import { deleteDocContent } from '../../../lib/aws/s3';
 
 export const DELETE: APIRoute = async ({ request, cookies }) => {
   try {
@@ -50,10 +50,10 @@ export const DELETE: APIRoute = async ({ request, cookies }) => {
     
     const success = await deleteDocDraft(draftId);
 
-    // Remove markdown from S3
+    // Remove ALL content from S3 (markdown + rendered HTML)
     if (success && draft.category && draft.slug) {
       try {
-        await deleteMarkdown(draft.category, draft.slug);
+        await deleteDocContent(draft.category, draft.slug);
       } catch (s3Err) {
         console.error('S3 delete failed (non-blocking):', s3Err);
       }

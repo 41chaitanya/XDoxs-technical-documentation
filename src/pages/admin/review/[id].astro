@@ -1,34 +1,50 @@
 ---
-import BaseLayout from '../../../layouts/BaseLayout.astro';
-import Header from '../../../components/Header.astro';
-import TableOfContents from '../../../components/TableOfContents.astro';
-import { verifyToken } from '../../../lib/auth/jwt';
-import { getDocDraft } from '../../../lib/db/docs';
-import { renderMarkdown } from '../../../lib/markdown/render';
-import { extractHeadingsFromTopic, splitMarkdownIntoTopics } from '../../../lib/markdown/splitter';
-import { extractLangBlocks } from '../../../lib/markdown/lang';
+import BaseLayout from "../../../layouts/BaseLayout.astro";
+import Header from "../../../components/Header.astro";
+import TableOfContents from "../../../components/TableOfContents.astro";
+import { verifyToken } from "../../../lib/auth/jwt";
+import { getDocDraft } from "../../../lib/db/docs";
+import { getMarkdown } from "../../../lib/aws/s3";
+import { renderMarkdown } from "../../../lib/markdown/render";
+import {
+  extractHeadingsFromTopic,
+  splitMarkdownIntoTopics,
+} from "../../../lib/markdown/splitter";
+import { extractLangBlocks } from "../../../lib/markdown/lang";
 
 export const prerender = false;
 
-const token = Astro.cookies.get('auth_token')?.value;
-if (!token) return Astro.redirect('/login');
+const token = Astro.cookies.get("auth_token")?.value;
+if (!token) return Astro.redirect("/login");
 
 const payload = verifyToken(token);
-if (!payload || payload.role !== 'super_admin') return Astro.redirect('/');
+if (!payload || payload.role !== "super_admin") return Astro.redirect("/");
 
 const { id } = Astro.params;
-if (!id) return Astro.redirect('/admin/dashboard');
+if (!id) return Astro.redirect("/admin/dashboard");
 
 const draft = await getDocDraft(id);
-if (!draft) return Astro.redirect('/admin/dashboard');
+if (!draft) return Astro.redirect("/admin/dashboard");
+
+// Load raw content from S3
+let rawContent = "";
+try {
+  rawContent = (await getMarkdown(draft.category, draft.slug)) || "";
+} catch (s3Err) {
+  console.error(
+    `❌ S3 getMarkdown failed for ${draft.category}/${draft.slug}:`,
+    s3Err,
+  );
+}
 
 // Check bilingual
-const { en: enContent, hi: hiContent } = extractLangBlocks(String(draft.content || ''));
+const { en: enContent, hi: hiContent } = extractLangBlocks(rawContent);
 const isBilingual = !!hiContent;
 
 // Split topics from EN content only
-const contentToSplit = isBilingual ? enContent : String(draft.content || '');
-let topics = draft.topics?.length ? draft.topics : splitMarkdownIntoTopics(contentToSplit);
+const contentToSplit = isBilingual ? enContent : rawContent;
+// Always split from S3 content since MongoDB only stores topic index (no content)
+let topics = splitMarkdownIntoTopics(contentToSplit);
 
 // For bilingual — re-split from EN only to avoid duplicate topics
 if (isBilingual) {
@@ -41,39 +57,70 @@ const htmlContent = await renderMarkdown(currentTopic.content);
 
 // Extract HI topic titles and contents
 function extractHiTitles(hi: string): string[] {
-  return hi.split('\n').filter(l => /^## /.test(l)).map(l => l.replace(/^## /, '').trim());
+  return hi
+    .split("\n")
+    .filter((l) => /^## /.test(l))
+    .map((l) => l.replace(/^## /, "").trim());
 }
 function extractHiContents(hi: string): string[] {
-  return hi.split(/^## /gm).slice(1).map(s => '## ' + s.trim());
+  return hi
+    .split(/^## /gm)
+    .slice(1)
+    .map((s) => "## " + s.trim());
 }
 
 const hiTitles = isBilingual ? extractHiTitles(hiContent) : [];
 const hiContents = isBilingual ? extractHiContents(hiContent) : [];
-const initialHiHtml = isBilingual && hiContents[0] ? await renderMarkdown(hiContents[0]) : '';
+const initialHiHtml =
+  isBilingual && hiContents[0] ? await renderMarkdown(hiContents[0]) : "";
 ---
 
-<BaseLayout title={`Review: ${draft.title} - Admin | XDoxs`} description={draft.description}>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" />
+<BaseLayout
+  title={`Review: ${draft.title} - Admin | XDoxs`}
+  description={draft.description}
+>
+  <link
+    rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css"
+  />
   <Header />
-  
+
   <div class="review-banner">
     <div class="review-banner-content">
-      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M9 11l3 3L22 4"/>
-        <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        width="20"
+        height="20"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+      >
+        <path d="M9 11l3 3L22 4"></path>
+        <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"></path>
       </svg>
       <span>Admin Review Mode - Review and approve this documentation</span>
       <div class="review-actions">
         <a href="/admin/dashboard" class="review-btn">Back to Dashboard</a>
-        {draft.status === 'pending_review' && (
-          <>
-            <button class="review-btn review-btn-reject" id="reject-btn">Reject</button>
-            <button class="review-btn review-btn-approve" id="approve-btn">Approve & Publish</button>
-          </>
-        )}
-        {draft.status === 'approved' && (
-          <button class="review-btn review-btn-approve" id="publish-btn">Publish to Public</button>
-        )}
+        {
+          draft.status === "pending_review" && (
+            <>
+              <button class="review-btn review-btn-reject" id="reject-btn">
+                Reject
+              </button>
+              <button class="review-btn review-btn-approve" id="approve-btn">
+                Approve & Publish
+              </button>
+            </>
+          )
+        }
+        {
+          draft.status === "approved" && (
+            <button class="review-btn review-btn-approve" id="publish-btn">
+              Publish to Public
+            </button>
+          )
+        }
       </div>
     </div>
   </div>
@@ -87,30 +134,46 @@ const initialHiHtml = isBilingual && hiContents[0] ? await renderMarkdown(hiCont
         <div class="instructor-info">
           <small>By: {draft.instructorEmail}</small>
         </div>
-        {isBilingual && (
-          <div class="lang-toggle-review">
-            <button class="lang-btn-review active" id="review-btn-en">English</button>
-            <button class="lang-btn-review" id="review-btn-hi">Hinglish</button>
-          </div>
-        )}
+        {
+          isBilingual && (
+            <div class="lang-toggle-review">
+              <button class="lang-btn-review active" id="review-btn-en">
+                English
+              </button>
+              <button class="lang-btn-review" id="review-btn-hi">
+                Hinglish
+              </button>
+            </div>
+          )
+        }
       </div>
-      
+
       <nav class="topics-nav" id="topics-nav">
-        {topics.map((topic, index) => (
-          <div class="topic-link" data-topic-index={index} data-lang="en">
-            <span class="topic-icon">📄</span>
-            <span class="topic-title">{topic.title}</span>
-          </div>
-        ))}
-        {isBilingual && hiTitles.map((title, index) => (
-          <div class="topic-link hi-topic-link" data-topic-index={index} data-lang="hi" style="display:none">
-            <span class="topic-icon">📄</span>
-            <span class="topic-title">{title}</span>
-          </div>
-        ))}
+        {
+          topics.map((topic, index) => (
+            <div class="topic-link" data-topic-index={index} data-lang="en">
+              <span class="topic-icon">📄</span>
+              <span class="topic-title">{topic.title}</span>
+            </div>
+          ))
+        }
+        {
+          isBilingual &&
+            hiTitles.map((title, index) => (
+              <div
+                class="topic-link hi-topic-link"
+                data-topic-index={index}
+                data-lang="hi"
+                style="display:none"
+              >
+                <span class="topic-icon">📄</span>
+                <span class="topic-title">{title}</span>
+              </div>
+            ))
+        }
       </nav>
     </aside>
-    
+
     <main class="doc-main">
       <nav class="breadcrumb">
         <a href="/">Home</a>
@@ -119,14 +182,14 @@ const initialHiHtml = isBilingual && hiContents[0] ? await renderMarkdown(hiCont
         <span>/</span>
         <span class="current">Review</span>
       </nav>
-      
+
       <article class="doc-article">
         <div class="doc-content markdown-body" id="content-area">
           <Fragment set:html={htmlContent} />
         </div>
       </article>
     </main>
-    
+
     <TableOfContents headings={headings} />
   </div>
 
@@ -135,7 +198,10 @@ const initialHiHtml = isBilingual && hiContents[0] ? await renderMarkdown(hiCont
     <div class="modal-content">
       <h3>Reject Documentation</h3>
       <p>Please provide feedback for the instructor:</p>
-      <textarea id="feedback-text" placeholder="Explain why this documentation is being rejected..." rows="5"></textarea>
+      <textarea
+        id="feedback-text"
+        placeholder="Explain why this documentation is being rejected..."
+        rows="5"></textarea>
       <div class="modal-actions">
         <button class="btn-secondary" id="cancel-reject">Cancel</button>
         <button class="btn-danger" id="confirm-reject">Reject</button>
@@ -377,16 +443,26 @@ const initialHiHtml = isBilingual && hiContents[0] ? await renderMarkdown(hiCont
       margin-top: 0;
     }
 
-    .markdown-body :global(h1) { font-size: 2.5rem; }
-    .markdown-body :global(h2) { 
-      font-size: 2rem; 
+    .markdown-body :global(h1) {
+      font-size: 2.5rem;
+    }
+    .markdown-body :global(h2) {
+      font-size: 2rem;
       padding-bottom: 0.5rem;
       border-bottom: 1px solid var(--border);
     }
-    .markdown-body :global(h3) { font-size: 1.5rem; }
-    .markdown-body :global(h4) { font-size: 1.25rem; }
-    .markdown-body :global(h5) { font-size: 1.1rem; }
-    .markdown-body :global(h6) { font-size: 1rem; }
+    .markdown-body :global(h3) {
+      font-size: 1.5rem;
+    }
+    .markdown-body :global(h4) {
+      font-size: 1.25rem;
+    }
+    .markdown-body :global(h5) {
+      font-size: 1.1rem;
+    }
+    .markdown-body :global(h6) {
+      font-size: 1rem;
+    }
 
     .markdown-body :global(p) {
       margin-bottom: 1rem;
@@ -398,7 +474,7 @@ const initialHiHtml = isBilingual && hiContents[0] ? await renderMarkdown(hiCont
       color: oklch(0.9 0 0);
       padding: 0.2rem 0.4rem;
       border-radius: 4px;
-      font-family: 'Courier New', Consolas, Monaco, monospace;
+      font-family: "Courier New", Consolas, Monaco, monospace;
       font-size: 0.9em;
     }
 
@@ -578,181 +654,215 @@ const initialHiHtml = isBilingual && hiContents[0] ? await renderMarkdown(hiCont
     }
   </style>
 
-  <script define:vars={{ draftId: String(draft._id), topics, isBilingual, hiContents }}>
-    const approveBtn = document.getElementById('approve-btn');
-    const rejectBtn = document.getElementById('reject-btn');
-    const publishBtn = document.getElementById('publish-btn');
-    const rejectModal = document.getElementById('reject-modal');
-    const cancelReject = document.getElementById('cancel-reject');
-    const confirmReject = document.getElementById('confirm-reject');
-    const feedbackText = document.getElementById('feedback-text');
-    const contentArea = document.getElementById('content-area');
+  <script
+    define:vars={{
+      draftId: String(draft._id),
+      topics,
+      isBilingual,
+      hiContents,
+    }}
+  >
+    const approveBtn = document.getElementById("approve-btn");
+    const rejectBtn = document.getElementById("reject-btn");
+    const publishBtn = document.getElementById("publish-btn");
+    const rejectModal = document.getElementById("reject-modal");
+    const cancelReject = document.getElementById("cancel-reject");
+    const confirmReject = document.getElementById("confirm-reject");
+    const feedbackText = document.getElementById("feedback-text");
+    const contentArea = document.getElementById("content-area");
 
-    let currentLang = 'en';
+    let currentLang = "en";
 
     // Lang toggle
-    const btnEn = document.getElementById('review-btn-en');
-    const btnHi = document.getElementById('review-btn-hi');
+    const btnEn = document.getElementById("review-btn-en");
+    const btnHi = document.getElementById("review-btn-hi");
 
     if (btnEn && btnHi) {
-      btnEn.addEventListener('click', () => {
-        currentLang = 'en';
-        btnEn.classList.add('active');
-        btnHi.classList.remove('active');
+      btnEn.addEventListener("click", () => {
+        currentLang = "en";
+        btnEn.classList.add("active");
+        btnHi.classList.remove("active");
         // Show EN topics, hide HI topics
-        document.querySelectorAll('.topic-link[data-lang="en"]').forEach(el => el.style.display = '');
-        document.querySelectorAll('.topic-link[data-lang="hi"]').forEach(el => el.style.display = 'none');
+        document
+          .querySelectorAll('.topic-link[data-lang="en"]')
+          .forEach((el) => (el.style.display = ""));
+        document
+          .querySelectorAll('.topic-link[data-lang="hi"]')
+          .forEach((el) => (el.style.display = "none"));
       });
-      btnHi.addEventListener('click', () => {
-        currentLang = 'hi';
-        btnHi.classList.add('active');
-        btnEn.classList.remove('active');
+      btnHi.addEventListener("click", () => {
+        currentLang = "hi";
+        btnHi.classList.add("active");
+        btnEn.classList.remove("active");
         // Show HI topics, hide EN topics
-        document.querySelectorAll('.topic-link[data-lang="en"]').forEach(el => el.style.display = 'none');
-        document.querySelectorAll('.topic-link[data-lang="hi"]').forEach(el => el.style.display = '');
+        document
+          .querySelectorAll('.topic-link[data-lang="en"]')
+          .forEach((el) => (el.style.display = "none"));
+        document
+          .querySelectorAll('.topic-link[data-lang="hi"]')
+          .forEach((el) => (el.style.display = ""));
       });
     }
 
     // Topic navigation
-    document.getElementById('topics-nav').addEventListener('click', async (e) => {
-      const link = e.target.closest('.topic-link');
-      if (!link) return;
-      const index = parseInt(link.dataset.topicIndex);
-      const lang = link.dataset.lang || 'en';
+    document
+      .getElementById("topics-nav")
+      .addEventListener("click", async (e) => {
+        const link = e.target.closest(".topic-link");
+        if (!link) return;
+        const index = parseInt(link.dataset.topicIndex);
+        const lang = link.dataset.lang || "en";
 
-      const content = lang === 'hi'
-        ? (hiContents[index] || '')
-        : topics[index]?.content || '';
+        const content =
+          lang === "hi"
+            ? hiContents[index] || ""
+            : topics[index]?.content || "";
 
-      if (!content) return;
+        if (!content) return;
 
-      const response = await fetch('/api/docs/render-topic', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content }),
+        const response = await fetch("/api/docs/render-topic", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ content }),
+        });
+        const data = await response.json();
+        if (data.html) contentArea.innerHTML = data.html;
+
+        // Active state
+        document
+          .querySelectorAll(".topic-link")
+          .forEach((l) => l.classList.remove("active"));
+        link.classList.add("active");
       });
-      const data = await response.json();
-      if (data.html) contentArea.innerHTML = data.html;
-
-      // Active state
-      document.querySelectorAll('.topic-link').forEach(l => l.classList.remove('active'));
-      link.classList.add('active');
-    });
 
     // Approve
     if (approveBtn) {
-      approveBtn.addEventListener('click', async () => {
-        if (!await Dialog.confirm('Approve and publish this documentation?', 'warn', 'Approve & Publish')) return;
+      approveBtn.addEventListener("click", async () => {
+        if (
+          !(await Dialog.confirm(
+            "Approve and publish this documentation?",
+            "warn",
+            "Approve & Publish",
+          ))
+        )
+          return;
 
         approveBtn.disabled = true;
-        approveBtn.textContent = 'Publishing...';
+        approveBtn.textContent = "Publishing...";
 
         try {
-          const response = await fetch('/api/admin/approve', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+          const response = await fetch("/api/admin/approve", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ draftId }),
           });
 
           const data = await response.json();
 
           if (data.success) {
-            await Dialog.alert('Documentation approved and published!', 'info');
-            window.location.href = '/admin/dashboard';
+            await Dialog.alert("Documentation approved and published!", "info");
+            window.location.href = "/admin/dashboard";
           } else {
-            await Dialog.alert('Error: ' + data.error, 'error');
+            await Dialog.alert("Error: " + data.error, "error");
             approveBtn.disabled = false;
-            approveBtn.textContent = 'Approve & Publish';
+            approveBtn.textContent = "Approve & Publish";
           }
         } catch (error) {
-          console.error('Error:', error);
-          await Dialog.alert('Error approving documentation', 'error');
+          console.error("Error:", error);
+          await Dialog.alert("Error approving documentation", "error");
           approveBtn.disabled = false;
-          approveBtn.textContent = 'Approve & Publish';
+          approveBtn.textContent = "Approve & Publish";
         }
       });
     }
 
     // Reject
     if (rejectBtn) {
-      rejectBtn.addEventListener('click', () => {
-        rejectModal.style.display = 'flex';
+      rejectBtn.addEventListener("click", () => {
+        rejectModal.style.display = "flex";
       });
     }
 
     if (cancelReject) {
-      cancelReject.addEventListener('click', () => {
-        rejectModal.style.display = 'none';
+      cancelReject.addEventListener("click", () => {
+        rejectModal.style.display = "none";
       });
     }
 
     if (confirmReject) {
-      confirmReject.addEventListener('click', async () => {
+      confirmReject.addEventListener("click", async () => {
         const feedback = feedbackText.value.trim();
         if (!feedback) {
-          await Dialog.alert('Please provide feedback', 'warn');
+          await Dialog.alert("Please provide feedback", "warn");
           return;
         }
 
         confirmReject.disabled = true;
-        confirmReject.textContent = 'Rejecting...';
+        confirmReject.textContent = "Rejecting...";
 
         try {
-          const response = await fetch('/api/admin/reject', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+          const response = await fetch("/api/admin/reject", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ draftId, feedback }),
           });
 
           const data = await response.json();
 
           if (data.success) {
-            await Dialog.alert('Documentation rejected', 'info');
-            window.location.href = '/admin/dashboard';
+            await Dialog.alert("Documentation rejected", "info");
+            window.location.href = "/admin/dashboard";
           } else {
-            await Dialog.alert('Error: ' + data.error, 'error');
+            await Dialog.alert("Error: " + data.error, "error");
             confirmReject.disabled = false;
-            confirmReject.textContent = 'Reject';
+            confirmReject.textContent = "Reject";
           }
         } catch (error) {
-          console.error('Error:', error);
-          await Dialog.alert('Error rejecting documentation', 'error');
+          console.error("Error:", error);
+          await Dialog.alert("Error rejecting documentation", "error");
           confirmReject.disabled = false;
-          confirmReject.textContent = 'Reject';
+          confirmReject.textContent = "Reject";
         }
       });
     }
 
     // Publish (for already approved docs)
     if (publishBtn) {
-      publishBtn.addEventListener('click', async () => {
-        if (!await Dialog.confirm('Publish this documentation to public?', 'warn', 'Publish')) return;
+      publishBtn.addEventListener("click", async () => {
+        if (
+          !(await Dialog.confirm(
+            "Publish this documentation to public?",
+            "warn",
+            "Publish",
+          ))
+        )
+          return;
 
         publishBtn.disabled = true;
-        publishBtn.textContent = 'Publishing...';
+        publishBtn.textContent = "Publishing...";
 
         try {
-          const response = await fetch('/api/admin/publish', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+          const response = await fetch("/api/admin/publish", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ draftId }),
           });
 
           const data = await response.json();
 
           if (data.success) {
-            await Dialog.alert('Documentation published!', 'info');
-            window.location.href = '/admin/dashboard';
+            await Dialog.alert("Documentation published!", "info");
+            window.location.href = "/admin/dashboard";
           } else {
-            await Dialog.alert('Error: ' + data.error, 'error');
+            await Dialog.alert("Error: " + data.error, "error");
             publishBtn.disabled = false;
-            publishBtn.textContent = 'Publish to Public';
+            publishBtn.textContent = "Publish to Public";
           }
         } catch (error) {
-          console.error('Error:', error);
-          await Dialog.alert('Error publishing documentation', 'error');
+          console.error("Error:", error);
+          await Dialog.alert("Error publishing documentation", "error");
           publishBtn.disabled = false;
-          publishBtn.textContent = 'Publish to Public';
+          publishBtn.textContent = "Publish to Public";
         }
       });
     }

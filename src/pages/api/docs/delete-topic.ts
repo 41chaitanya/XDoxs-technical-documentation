@@ -1,7 +1,8 @@
 import type { APIRoute } from 'astro';
 import { verifyToken } from '../../../lib/auth/jwt';
 import { getDocDraft, updateDocDraft } from '../../../lib/db/docs';
-import { uploadMarkdown } from '../../../lib/aws/s3';
+import { splitMarkdownIntoTopics } from '../../../lib/markdown/splitter';
+import { uploadMarkdown, getMarkdown } from '../../../lib/aws/s3';
 
 export const DELETE: APIRoute = async ({ request, cookies }) => {
   try {
@@ -24,15 +25,29 @@ export const DELETE: APIRoute = async ({ request, cookies }) => {
       return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403, headers: { 'Content-Type': 'application/json' } });
     }
 
-    const topics = (draft.topics || [])
+    // Load content from S3, split into topics, remove the target
+    const markdown = await getMarkdown(draft.category, draft.slug) || '';
+    const splitTopics = splitMarkdownIntoTopics(markdown);
+    const topicIndex = draft.topics || [];
+
+    // Find the position of the topic to delete
+    const deleteIdx = topicIndex.findIndex(t => t.id === topicId);
+    if (deleteIdx === -1) {
+      return new Response(JSON.stringify({ error: 'Topic not found' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
+    }
+
+    // Remove from both arrays
+    splitTopics.splice(deleteIdx, 1);
+    const updatedTopics = topicIndex
       .filter(t => t.id !== topicId)
       .map((t, i) => ({ ...t, order: i }));
 
-    const fullContent = topics.map(t => t.content).join('\n\n');
-    await updateDocDraft(draftId, { topics, content: fullContent });
+    // Rebuild content and upload to S3
+    const fullContent = splitTopics.map(t => t.content).join('\n\n');
+    await uploadMarkdown(draft.category, draft.slug, fullContent);
 
-    // Sync to S3
-    try { await uploadMarkdown(draft.category, draft.slug, fullContent); } catch (e) { console.error('S3 sync failed:', e); }
+    // Update topic index in MongoDB (no content)
+    await updateDocDraft(draftId, { topics: updatedTopics });
 
     return new Response(JSON.stringify({ success: true }), { status: 200, headers: { 'Content-Type': 'application/json' } });
   } catch (error) {

@@ -1,9 +1,13 @@
 // Seed sample documentation into MongoDB for testing
+// Content is uploaded to S3; MongoDB stores only metadata.
 import { MongoClient } from 'mongodb';
 import { parse, Renderer } from 'marked';
 import hljs from 'highlight.js';
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/xdoxs';
+const BUCKET = process.env.S3_DOCS_BUCKET || 'xdoxs-docs-content';
+const REGION = process.env.AWS_REGION || 'ap-south-2';
 
 // ---------- Minimal markdown renderer (mirrors src/lib/markdown/render.ts) ----------
 
@@ -1359,6 +1363,7 @@ For two-dimensional layouts:
 
 async function seedDocs() {
   const client = new MongoClient(MONGODB_URI);
+  const s3 = new S3Client({ region: REGION });
 
   try {
     await client.connect();
@@ -1382,6 +1387,27 @@ async function seedDocs() {
       // Pre-render the markdown to HTML
       const renderedHtml = renderMarkdownSync(doc.content);
 
+      // Upload raw markdown to S3
+      const mdKey = `docs/${doc.category}/${doc.slug}.md`;
+      await s3.send(new PutObjectCommand({
+        Bucket: BUCKET,
+        Key: mdKey,
+        Body: doc.content,
+        ContentType: 'text/markdown; charset=utf-8',
+      }));
+      console.log(`  📦 S3: ${mdKey}`);
+
+      // Upload rendered HTML to S3
+      const htmlKey = `docs/${doc.category}/${doc.slug}.html`;
+      await s3.send(new PutObjectCommand({
+        Bucket: BUCKET,
+        Key: htmlKey,
+        Body: renderedHtml,
+        ContentType: 'text/html; charset=utf-8',
+      }));
+      console.log(`  📦 S3: ${htmlKey}`);
+
+      // MongoDB stores ONLY metadata — no content, no renderedHtml
       const draft = {
         instructorId: 'seed-script',
         instructorEmail: 'instructor@xdoxs.com',
@@ -1389,8 +1415,6 @@ async function seedDocs() {
         title: doc.title,
         slug: doc.slug,
         description: doc.description,
-        content: doc.content,
-        renderedHtml,
         tags: doc.tags,
         status: 'approved',
         createdAt: new Date(),

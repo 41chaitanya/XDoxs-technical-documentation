@@ -1,8 +1,8 @@
 import type { APIRoute } from 'astro';
 import { verifyToken } from '../../../lib/auth/jwt';
 import { getDocDraft, updateDocDraft } from '../../../lib/db/docs';
-import type { Topic } from '../../../lib/db/models';
-import { uploadMarkdown } from '../../../lib/aws/s3';
+import type { Topic, TopicIndex } from '../../../lib/db/models';
+import { uploadMarkdown, getMarkdown } from '../../../lib/aws/s3';
 
 export const POST: APIRoute = async ({ request, cookies }) => {
   try {
@@ -25,26 +25,25 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403, headers: { 'Content-Type': 'application/json' } });
     }
 
-    const topics: Topic[] = draft.topics || [];
     const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-    const newTopic: Topic = {
+    const topicContent = content || `## ${title}\n\nStart writing here...`;
+    const newTopicIndex: TopicIndex = {
       id: `topic-${Date.now()}`,
       title,
       slug,
-      content: content || `## ${title}\n\nStart writing here...`,
-      order: topics.length,
+      order: (draft.topics || []).length,
     };
 
-    topics.push(newTopic);
+    // Update topic index in MongoDB (no content)
+    const updatedTopics = [...(draft.topics || []), newTopicIndex];
+    await updateDocDraft(draftId, { topics: updatedTopics });
 
-    // Rebuild full content from topics
-    const fullContent = topics.map(t => t.content).join('\n\n');
-    await updateDocDraft(draftId, { topics, content: fullContent });
+    // Append new topic content to S3 markdown
+    const existingContent = await getMarkdown(draft.category, draft.slug) || '';
+    const fullContent = existingContent ? `${existingContent}\n\n${topicContent}` : topicContent;
+    await uploadMarkdown(draft.category, draft.slug, fullContent);
 
-    // Sync to S3
-    try { await uploadMarkdown(draft.category, draft.slug, fullContent); } catch (e) { console.error('S3 sync failed:', e); }
-
-    return new Response(JSON.stringify({ success: true, topic: newTopic }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    return new Response(JSON.stringify({ success: true, topic: { ...newTopicIndex, content: topicContent } }), { status: 200, headers: { 'Content-Type': 'application/json' } });
   } catch (error) {
     console.error('Add topic error:', error);
     return new Response(JSON.stringify({ error: 'Internal server error' }), { status: 500, headers: { 'Content-Type': 'application/json' } });

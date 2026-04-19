@@ -9,14 +9,47 @@ export interface Topic {
 }
 
 export function splitMarkdownIntoTopics(markdown: string): Topic[] {
+  const trimmed = markdown.trim();
+  if (!trimmed) return [];
+
   const topics: Topic[] = [];
   
   // Split by H2 headings (##)
-  const sections = markdown.split(/^## /gm);
+  const sections = trimmed.split(/^## /gm);
   
-  // Process all sections (each starts with H2)
-  // Note: any content before the first ## is intentionally ignored —
-  // the uploaded .md file should include its own introduction as a ## section
+  // If there are no ## headings, wrap the entire content as a single topic
+  if (sections.length <= 1) {
+    // Try to extract a title from the first # heading, or use a default
+    const h1Match = trimmed.match(/^#\s+(.+)$/m);
+    const title = h1Match ? h1Match[1].trim() : 'Introduction';
+    const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    
+    topics.push({
+      id: 'topic-1',
+      title,
+      slug,
+      content: trimmed,
+      order: 0,
+    });
+    return topics;
+  }
+
+  // Content before the first ## heading — include as "Introduction" topic if non-trivial
+  const preamble = sections[0].trim();
+  if (preamble && preamble.length > 20) {
+    const h1Match = preamble.match(/^#\s+(.+)$/m);
+    const title = h1Match ? h1Match[1].trim() : 'Introduction';
+    const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    topics.push({
+      id: 'topic-0',
+      title,
+      slug,
+      content: preamble,
+      order: 0,
+    });
+  }
+
+  // Process all ## sections
   for (let i = 1; i < sections.length; i++) {
     const section = sections[i];
     const lines = section.split('\n');
@@ -33,7 +66,7 @@ export function splitMarkdownIntoTopics(markdown: string): Topic[] {
         title,
         slug,
         content: `## ${title}\n\n${content}`,
-        order: i - 1
+        order: topics.length
       });
     }
   }

@@ -1,57 +1,73 @@
 ---
-import { getDb } from '../../lib/db/mongodb';
-import { COLLECTIONS } from '../../lib/db/models';
-import { renderMarkdown } from '../../lib/markdown/render';
-import { splitMarkdownIntoTopics, extractHeadingsFromTopic } from '../../lib/markdown/splitter';
-import { extractLangBlocks } from '../../lib/markdown/lang';
-import DocLayout from '../../layouts/DocLayout.astro';
+import { getDb } from "../../lib/db/mongodb";
+import { COLLECTIONS } from "../../lib/db/models";
+import { renderMarkdown } from "../../lib/markdown/render";
+import {
+  splitMarkdownIntoTopics,
+  extractHeadingsFromTopic,
+} from "../../lib/markdown/splitter";
+import { extractLangBlocks } from "../../lib/markdown/lang";
+import { getDocContent } from "../../lib/aws/s3";
+import DocLayout from "../../layouts/DocLayout.astro";
 
-// SSR: Fetch from MongoDB at runtime, CloudFront caches the response
+// SSR: Fetch metadata from MongoDB, content from S3. CloudFront caches the response.
 export const prerender = false;
 
 const { slug } = Astro.params;
-const slugPath = Array.isArray(slug) ? slug.join('/') : (slug ?? '');
+const slugPath = Array.isArray(slug) ? slug.join("/") : (slug ?? "");
 
-const parts = slugPath.split('/');
+const parts = slugPath.split("/");
 const category = parts[0];
 const docSlug = parts[1];
 
-if (!category || !docSlug) return Astro.redirect('/404');
+if (!category || !docSlug) return Astro.redirect("/404");
 
-// Fetch approved doc from MongoDB at request time
+// Fetch approved doc metadata from MongoDB
 const db = await getDb();
-const draft = await db.collection(COLLECTIONS.DOC_DRAFTS)
-  .findOne({ category, slug: docSlug, status: 'approved' }) as any;
+const draft = (await db
+  .collection(COLLECTIONS.DOC_DRAFTS)
+  .findOne({ category, slug: docSlug, status: "approved" })) as any;
 
-if (!draft) return Astro.redirect('/404');
+if (!draft) return Astro.redirect("/404");
 
 // CloudFront caches for 24h; we invalidate on republish
-Astro.response.headers.set('Cache-Control', 'public, s-maxage=86400, max-age=0, stale-while-revalidate=3600');
+Astro.response.headers.set(
+  "Cache-Control",
+  "public, s-maxage=86400, max-age=0, stale-while-revalidate=3600",
+);
 
-const { en: enContent, hi: hiContent } = extractLangBlocks(String(draft.content || ''));
+// Load content from S3 (primary storage)
+const { markdown, htmlEn, htmlHi } = await getDocContent(category, docSlug);
 
-const htmlContent = String(draft.renderedHtml || '') || await renderMarkdown(enContent);
-const htmlContentHi = String(draft.renderedHtmlHi || '');
+const { en: enContent, hi: hiContent } = extractLangBlocks(markdown);
+
+// Use pre-rendered HTML from S3 if available, otherwise render on-the-fly
+const htmlContent = htmlEn || (await renderMarkdown(enContent));
+const htmlContentHi = htmlHi || "";
 const hasHinglish = !!htmlContentHi;
 
 // Extract headings for sidebar/TOC - for both languages
 const topicsEn = splitMarkdownIntoTopics(enContent);
-const headingsEn = topicsEn.flatMap(t => extractHeadingsFromTopic(t.content));
-const h2TopicsEn = headingsEn.filter(h => h.depth === 2);
+const headingsEn = topicsEn.flatMap((t) => extractHeadingsFromTopic(t.content));
+const h2TopicsEn = headingsEn.filter((h) => h.depth === 2);
 
 let h2TopicsHi: Array<{ slug: string; text: string }> = [];
 if (hasHinglish && hiContent) {
   const topicsHi = splitMarkdownIntoTopics(hiContent);
-  const headingsHi = topicsHi.flatMap(t => extractHeadingsFromTopic(t.content));
-  h2TopicsHi = headingsHi.filter(h => h.depth === 2);
+  const headingsHi = topicsHi.flatMap((t) =>
+    extractHeadingsFromTopic(t.content),
+  );
+  h2TopicsHi = headingsHi.filter((h) => h.depth === 2);
 }
 
-const publishedAt = draft.publishedAt ? new Date(draft.publishedAt) : new Date(draft.updatedAt);
+const publishedAt = draft.publishedAt
+  ? new Date(draft.publishedAt)
+  : new Date(draft.updatedAt);
 ---
 
 <DocLayout
   title={draft.title}
-  description={draft.description || ''}
+  description={draft.description || ""}
   date={publishedAt}
   author={draft.instructorEmail}
   category={draft.category}
@@ -63,5 +79,13 @@ const publishedAt = draft.publishedAt ? new Date(draft.publishedAt) : new Date(d
   hasHinglish={hasHinglish}
 >
   <div class="doc-content-en" set:html={htmlContent} />
-  {hasHinglish && <div class="doc-content-hi" set:html={htmlContentHi} style="display:none" />}
+  {
+    hasHinglish && (
+      <div
+        class="doc-content-hi"
+        set:html={htmlContentHi}
+        style="display:none"
+      />
+    )
+  }
 </DocLayout>

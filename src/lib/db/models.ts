@@ -10,14 +10,27 @@ export interface User {
   createdAt: Date;
 }
 
-export interface Topic {
+/** Topic index stored in MongoDB — metadata only, no content */
+export interface TopicIndex {
   id: string;
   title: string;
   slug: string;
-  content: string;
   order: number;
 }
 
+/** Full topic with content — runtime only, content loaded from S3 */
+export interface Topic extends TopicIndex {
+  content: string;
+}
+
+/**
+ * DocDraft — metadata stored in MongoDB.
+ *
+ * Content fields (markdown, rendered HTML) are stored in S3:
+ *   - Raw markdown  → s3://bucket/docs/{category}/{slug}.md
+ *   - Rendered HTML  → s3://bucket/docs/{category}/{slug}.html
+ *   - Rendered HI    → s3://bucket/docs/{category}/{slug}.hi.html
+ */
 export interface DocDraft {
   _id?: ObjectId;
   instructorId: string;
@@ -26,10 +39,11 @@ export interface DocDraft {
   title: string;
   slug: string;
   description: string;
-  content: string; // Full markdown content
-  renderedHtml?: string; // Pre-rendered HTML — English (generated at publish time)
-  renderedHtmlHi?: string; // Pre-rendered HTML — Hinglish (generated at publish time)
-  topics?: Topic[]; // Split topics from markdown
+  // Content lives in S3 — NOT persisted to MongoDB
+  content?: string;
+  renderedHtml?: string;
+  renderedHtmlHi?: string;
+  topics?: TopicIndex[]; // Topic index (no content) — content derived from S3 markdown
   tags: string[];
   status: 'draft' | 'pending_review' | 'approved' | 'rejected' | 'needs_changes';
   feedback?: string; // Admin feedback
@@ -38,14 +52,30 @@ export interface DocDraft {
   publishedAt?: Date;
 }
 
+/** Fields that must NOT be persisted to MongoDB (stored in S3 instead) */
+export const S3_ONLY_FIELDS = ['content', 'renderedHtml', 'renderedHtmlHi'] as const;
+
+/** Strip S3-only content fields before writing to MongoDB */
+export function stripContentFields<T extends Record<string, any>>(doc: T): Omit<T, 'content' | 'renderedHtml' | 'renderedHtmlHi'> {
+  const copy = { ...doc };
+  for (const field of S3_ONLY_FIELDS) {
+    delete copy[field];
+  }
+  return copy;
+}
+
+/** Strip content from topic objects, keeping only the index */
+export function topicsToIndex(topics: Topic[]): TopicIndex[] {
+  return topics.map(({ id, title, slug, order }) => ({ id, title, slug, order }));
+}
+
 export interface PublishedDoc {
   _id?: ObjectId;
   docDraftId: string;
   category: string;
   title: string;
   slug: string;
-  content: string;
-  filePath: string; // Path to generated .md file
+  filePath: string; // S3 key for the markdown file
   publishedAt: Date;
   publishedBy: string; // Admin ID
 }
