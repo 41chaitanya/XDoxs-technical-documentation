@@ -28,12 +28,7 @@ const userRole = payload.role;
         <p class="user-info">Welcome, {userEmail}</p>
       </div>
       <div class="header-actions">
-        <a href="/instructor/docs/ai-generate" class="btn-ai">
-          <span class="icon">AI</span> Generate with AI
-        </a>
-        <a href="/instructor/docs/upload" class="btn-primary">
-          <span class="icon">↑</span> Upload Documentation
-        </a>
+        <!-- Upload functionality will be rebuilt -->
       </div>
     </div>
 
@@ -97,7 +92,7 @@ const userRole = payload.role;
       flex-wrap: wrap;
     }
 
-    .btn-primary, .btn-ai {
+    .btn-primary {
       display: inline-flex;
       align-items: center;
       gap: 0.5rem;
@@ -107,23 +102,11 @@ const userRole = payload.role;
       border-radius: 8px;
       font-weight: 500;
       transition: all 0.2s;
-    }
-
-    .btn-primary {
       background: var(--primary);
     }
 
     .btn-primary:hover {
       background: var(--primary-hover);
-      transform: translateY(-2px);
-    }
-
-    .btn-ai {
-      background: linear-gradient(135deg, oklch(0.6 0.2 280), oklch(0.5 0.2 320));
-    }
-
-    .btn-ai:hover {
-      background: linear-gradient(135deg, oklch(0.55 0.2 280), oklch(0.45 0.2 320));
       transform: translateY(-2px);
     }
 
@@ -352,8 +335,7 @@ const userRole = payload.role;
         if (drafts.length === 0) {
           docsList.innerHTML = '\
             <div class="empty-state">\
-              <p>No documentation yet. Upload your first one!</p>\
-              <a href="/instructor/docs/upload" class="btn-primary">Upload Documentation</a>\
+              <p>No documentation yet. Upload functionality coming soon!</p>\
             </div>\
           ';
           return;

@@ -35,6 +35,14 @@ if (isBilingual) {
   topics = splitMarkdownIntoTopics(enContent);
 }
 
+// Safety check: Ensure topics array is not empty
+if (!topics || topics.length === 0) {
+  topics = [{
+    title: draft.title || 'Untitled',
+    content: contentToSplit || 'No content available'
+  }];
+}
+
 const currentTopic = topics[0];
 const headings = extractHeadingsFromTopic(currentTopic.content);
 const htmlContent = await renderMarkdown(currentTopic.content);

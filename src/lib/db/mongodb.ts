@@ -6,7 +6,7 @@ declare global {
   var _mongoClientPromise: Promise<MongoClient> | undefined;
 }
 
-const MONGODB_URI = import.meta.env.MONGODB_URI || 'mongodb://localhost:27017/xdoxs';
+const MONGODB_URI = import.meta.env.MONGODB_URI || process.env.MONGODB_URI || 'mongodb://localhost:27017/xdoxs';
 
 let client: MongoClient;
 let clientPromise: Promise<MongoClient>;

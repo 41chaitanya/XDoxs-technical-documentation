@@ -71,24 +71,6 @@ const categories = [...new Set(allDocs.map((doc: any) => doc.category))];
         </div>
       </div>
     </section>
-    
-    <!-- Create Your Own Docs -->
-    <section class="section section-alt">
-      <div class="container">
-        <div class="create-docs-section">
-          <div class="create-docs-content">
-            <h2>Create Your Own Documentation</h2>
-            <p>
-              Students can create and share their own project documentation using XDoxs. 
-              Document your projects, share knowledge with the community, and build your portfolio.
-            </p>
-            <a href="/login" class="btn btn-create">
-              Get Started
-            </a>
-          </div>
-        </div>
-      </div>
-    </section>
   </main>
   
   <footer class="footer" role="contentinfo">
@@ -232,38 +214,6 @@ const categories = [...new Set(allDocs.map((doc: any) => doc.category))];
 
   .section-header p {
     font-size: 1.125rem;
-  }
-
-  /* Create Docs Section */
-  .create-docs-section {
-    max-width: 700px;
-    margin: 0 auto;
-    text-align: center;
-  }
-
-  .create-docs-content h2 {
-    font-size: 2.25rem;
-    margin-bottom: 1rem;
-    color: var(--text-primary);
-  }
-
-  .create-docs-content p {
-    font-size: 1.125rem;
-    color: var(--text-secondary);
-    margin-bottom: 2rem;
-    line-height: 1.7;
-  }
-
-  .btn-create {
-    background: var(--primary);
-    color: white;
-    padding: 0.875rem 2.5rem;
-    font-size: 1.05rem;
-  }
-
-  .btn-create:hover {
-    background: var(--primary-hover);
-    box-shadow: 0 6px 16px oklch(0 0 0 / 0.15);
   }
 
   /* Grid */

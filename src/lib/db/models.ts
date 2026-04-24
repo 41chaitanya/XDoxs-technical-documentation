@@ -10,11 +10,10 @@ export interface User {
   createdAt: Date;
 }
 
-export interface Topic {
+export interface Tab {
   id: string;
   title: string;
-  slug: string;
-  content: string;
+  content: string; // Full markdown content for this tab
   order: number;
 }
 
@@ -23,13 +22,13 @@ export interface DocDraft {
   instructorId: string;
   instructorEmail: string;
   category: string;
-  title: string;
+  title: string; // Main document title
   slug: string;
   description: string;
-  content: string; // Full markdown content
+  content: string; // Full markdown content (for backward compatibility)
   renderedHtml?: string; // Pre-rendered HTML — English (generated at publish time)
   renderedHtmlHi?: string; // Pre-rendered HTML — Hinglish (generated at publish time)
-  topics?: Topic[]; // Split topics from markdown
+  tabs?: Tab[]; // Multiple tabs (each tab = one uploaded MD file)
   tags: string[];
   status: 'draft' | 'pending_review' | 'approved' | 'rejected' | 'needs_changes';
   feedback?: string; // Admin feedback

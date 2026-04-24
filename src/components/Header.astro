@@ -74,48 +74,91 @@
         </div>
         
         <div class="auth-slot">
-          <div class="user-profile">
+          <div class="user-profile" style="display: none;">
             <button class="profile-btn" aria-label="User profile">
               <div class="profile-avatar">U</div>
             </button>
           
-          <div class="profile-dropdown">
-            <div class="profile-info">
-              <div class="profile-name"></div>
-              <div class="profile-role"></div>
+            <div class="profile-dropdown">
+              <div class="profile-info">
+                <div class="profile-name"></div>
+                <div class="profile-role"></div>
+              </div>
+              <div class="profile-divider"></div>
+              <div class="profile-links">
+                <a href="/instructor/dashboard" class="profile-link dashboard-link" style="display: none;">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <rect x="3" y="3" width="7" height="7"></rect>
+                    <rect x="14" y="3" width="7" height="7"></rect>
+                    <rect x="14" y="14" width="7" height="7"></rect>
+                    <rect x="3" y="14" width="7" height="7"></rect>
+                  </svg>
+                  Instructor Dashboard
+                </a>
+                <a href="/admin/dashboard" class="profile-link admin-link" style="display: none;">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                    <path d="M2 17l10 5 10-5"></path>
+                    <path d="M2 12l10 5 10-5"></path>
+                  </svg>
+                  Admin Dashboard
+                </a>
+                <button class="profile-link logout-btn" id="logout-btn">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                    <polyline points="16 17 21 12 16 7"></polyline>
+                    <line x1="21" y1="12" x2="9" y2="12"></line>
+                  </svg>
+                  Logout
+                </button>
+              </div>
             </div>
-            <div class="profile-divider"></div>
-            <div class="profile-links">
-              <a href="/instructor/dashboard" class="profile-link dashboard-link" style="display: none;">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <rect x="3" y="3" width="7" height="7"></rect>
-                  <rect x="14" y="3" width="7" height="7"></rect>
-                  <rect x="14" y="14" width="7" height="7"></rect>
-                  <rect x="3" y="14" width="7" height="7"></rect>
-                </svg>
-                Instructor Dashboard
-              </a>
-              <a href="/admin/dashboard" class="profile-link admin-link" style="display: none;">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
-                  <path d="M2 17l10 5 10-5"></path>
-                  <path d="M2 12l10 5 10-5"></path>
-                </svg>
-                Admin Dashboard
-              </a>
-              <button class="profile-link logout-btn" id="logout-btn">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-                  <polyline points="16 17 21 12 16 7"></polyline>
-                  <line x1="21" y1="12" x2="9" y2="12"></line>
-                </svg>
-                Logout
+          </div>
+        
+          <a href="/login" class="login-btn">Login</a>
+        </div>
+          <button class="theme-btn" aria-label="Change theme color" aria-expanded="false" aria-haspopup="true">
+            <svg class="theme-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="5"></circle>
+              <line x1="12" y1="1" x2="12" y2="3"></line>
+              <line x1="12" y1="21" x2="12" y2="23"></line>
+              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+              <line x1="1" y1="12" x2="3" y2="12"></line>
+              <line x1="21" y1="12" x2="23" y2="12"></line>
+              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+              <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+            </svg>
+          </button>
+          
+          <div class="theme-dropdown">
+            <div class="theme-options">
+              <button class="theme-option" data-hue="165.37" title="Teal" aria-label="Teal theme">
+                <span class="theme-circle" style="background: oklch(0.50 0.13 165.37)"></span>
+              </button>
+              <button class="theme-option" data-hue="0" title="Gray" aria-label="Gray theme">
+                <span class="theme-circle" style="background: oklch(0.50 0.13 0)"></span>
+              </button>
+              <button class="theme-option" data-hue="31.08" title="Orange" aria-label="Orange theme">
+                <span class="theme-circle" style="background: oklch(0.50 0.13 31.08)"></span>
+              </button>
+              <button class="theme-option" data-hue="71.47" title="Yellow" aria-label="Yellow theme">
+                <span class="theme-circle" style="background: oklch(0.50 0.13 71.47)"></span>
+              </button>
+              <button class="theme-option" data-hue="120" title="Green" aria-label="Green theme">
+                <span class="theme-circle" style="background: oklch(0.50 0.13 120)"></span>
+              </button>
+              <button class="theme-option" data-hue="240" title="Blue" aria-label="Blue theme">
+                <span class="theme-circle" style="background: oklch(0.50 0.13 240)"></span>
+              </button>
+              <button class="theme-option" data-hue="280" title="Purple" aria-label="Purple theme">
+                <span class="theme-circle" style="background: oklch(0.50 0.13 280)"></span>
+              </button>
+              <button class="theme-option" data-hue="330" title="Pink" aria-label="Pink theme">
+                <span class="theme-circle" style="background: oklch(0.50 0.13 330)"></span>
               </button>
             </div>
           </div>
-        </div>
-        
-        <a href="/login" class="login-btn">Login</a>
         </div>
       </div>
     </nav>
@@ -425,7 +468,7 @@
     box-shadow: 0 0 0 2px var(--bg-primary), 0 0 0 4px var(--border);
   }
 
-  /* Auth slot: fixed-size container so login<->profile swap causes zero CLS */
+  /* Auth slot */
   .auth-slot {
     position: relative;
     min-width: 80px;
@@ -433,17 +476,6 @@
     display: flex;
     align-items: center;
     justify-content: flex-end;
-  }
-
-  .auth-slot .login-btn {
-    position: absolute;
-    right: 0;
-    top: 50%;
-    transform: translateY(-50%);
-  }
-
-  .auth-slot .user-profile {
-    visibility: hidden;
   }
 
   /* User Profile */
@@ -633,35 +665,29 @@
       }).catch(function(){});
     }, {once: false});
 
-    // Lazy-load auth state ONLY when user hovers on auth area
-    var authLoaded = false;
-    var authSlot = document.querySelector('.auth-slot');
-    if (authSlot) authSlot.addEventListener('mouseenter', function() {
-      if (authLoaded) return;
-      authLoaded = true;
-      fetch('/api/auth/me', {credentials:'include'}).then(function(r){
-        if (!r.ok) return null;
-        return r.json();
-      }).then(function(d){
-        if (!d || !d.user) return;
-        var lb = document.querySelector('.login-btn');
-        var up = document.querySelector('.user-profile');
-        if (lb) lb.style.display = 'none';
-        if (up) {
-          up.style.visibility = 'visible';
-          var pn = up.querySelector('.profile-name');
-          var pr = up.querySelector('.profile-role');
-          var pa = up.querySelector('.profile-avatar');
-          if (pn) pn.textContent = d.user.email;
-          if (pr) pr.textContent = d.user.role.replace('_', ' ');
-          if (pa) pa.textContent = d.user.email.charAt(0).toUpperCase();
-          var dl = up.querySelector('.dashboard-link');
-          if (dl && (d.user.role === 'instructor' || d.user.role === 'super_admin')) dl.style.display = 'flex';
-          var al = up.querySelector('.admin-link');
-          if (al && d.user.role === 'super_admin') al.style.display = 'flex';
-        }
-      }).catch(function(){});
-    }, {once: true});
+    // Check auth state immediately on page load
+    fetch('/api/auth/me', {credentials:'include'}).then(function(r){
+      if (!r.ok) return null;
+      return r.json();
+    }).then(function(d){
+      if (!d || !d.user) return;
+      var lb = document.querySelector('.login-btn');
+      var up = document.querySelector('.user-profile');
+      if (lb) lb.style.display = 'none';
+      if (up) {
+        up.style.display = 'block';
+        var pn = up.querySelector('.profile-name');
+        var pr = up.querySelector('.profile-role');
+        var pa = up.querySelector('.profile-avatar');
+        if (pn) pn.textContent = d.user.email;
+        if (pr) pr.textContent = d.user.role.replace('_', ' ');
+        if (pa) pa.textContent = d.user.email.charAt(0).toUpperCase();
+        var dl = up.querySelector('.dashboard-link');
+        if (dl && (d.user.role === 'instructor' || d.user.role === 'super_admin')) dl.style.display = 'flex';
+        var al = up.querySelector('.admin-link');
+        if (al && d.user.role === 'super_admin') al.style.display = 'flex';
+      }
+    }).catch(function(){});
 
     // Logout
     var lb = document.getElementById('logout-btn');
