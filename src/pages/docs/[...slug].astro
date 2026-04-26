@@ -2,8 +2,8 @@
 import { getDb } from '../../lib/db/mongodb';
 import { COLLECTIONS } from '../../lib/db/models';
 import { renderMarkdown } from '../../lib/markdown/render';
-import { splitMarkdownIntoTopics, extractHeadingsFromTopic } from '../../lib/markdown/splitter';
 import { extractLangBlocks } from '../../lib/markdown/lang';
+import { extractH2Headings } from '../../lib/markdown/headings';
 import DocLayout from '../../layouts/DocLayout.astro';
 
 // ✅ STATIC GENERATION: Build time pe MongoDB se fetch, runtime pe NO DB calls
@@ -41,16 +41,15 @@ const htmlContentHi = String(draft.renderedHtmlHi || '');
 const hasHinglish = !!htmlContentHi;
 
 // Extract headings for sidebar/TOC - for both languages
-const topicsEn = splitMarkdownIntoTopics(enContent);
-const headingsEn = topicsEn.flatMap(t => extractHeadingsFromTopic(t.content));
-const h2TopicsEn = headingsEn.filter(h => h.depth === 2);
+const h2TopicsEn = extractH2Headings(enContent);
 
 let h2TopicsHi: Array<{ slug: string; text: string }> = [];
 if (hasHinglish && hiContent) {
-  const topicsHi = splitMarkdownIntoTopics(hiContent);
-  const headingsHi = topicsHi.flatMap(t => extractHeadingsFromTopic(t.content));
-  h2TopicsHi = headingsHi.filter(h => h.depth === 2);
+  h2TopicsHi = extractH2Headings(hiContent);
 }
+
+// Convert to format with depth for headings prop (depth 2 for H2)
+const headingsWithDepth = h2TopicsEn.map(h => ({ ...h, depth: 2 }));
 
 const publishedAt = draft.publishedAt ? new Date(draft.publishedAt) : new Date(draft.updatedAt);
 ---
@@ -62,7 +61,7 @@ const publishedAt = draft.publishedAt ? new Date(draft.publishedAt) : new Date(d
   author={draft.instructorEmail}
   category={draft.category}
   tags={draft.tags || []}
-  headings={headingsEn}
+  headings={headingsWithDepth}
   docId={slugPath}
   topicsEn={h2TopicsEn}
   topicsHi={h2TopicsHi}

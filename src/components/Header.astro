@@ -9,69 +9,10 @@
       <a href="/" class="logo" aria-label="XDoxs - Home">XDoxs</a>
       
       <div class="nav-links">
-        <!-- Docs Dropdown -->
-        <div class="dropdown">
-          <button class="dropdown-trigger" aria-expanded="false" aria-haspopup="true" aria-label="Documentation menu">
-            Docs
-            <svg class="dropdown-arrow" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <polyline points="6 9 12 15 18 9"></polyline>
-            </svg>
-          </button>
-          
-          <div class="dropdown-menu">
-            <div class="dropdown-content" id="docs-nav-content">
-              <div class="dropdown-loading">Loading...</div>
-            </div>
-          </div>
-        </div>
-        
+        <a href="/learn">Learn</a>
+        <a href="/blogs">Blogs</a>
+        <a href="/community">Community</a>
         <a href="https://github.com/yourusername/xdoxs" target="_blank" rel="noopener noreferrer" aria-label="GitHub (opens in new tab)">GitHub</a>
-        
-        <!-- Theme Selector (Sun Icon) -->
-        <div class="theme-selector">
-          <button class="theme-btn" aria-label="Change theme color" aria-expanded="false" aria-haspopup="true">
-            <svg class="theme-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <circle cx="12" cy="12" r="5"></circle>
-              <line x1="12" y1="1" x2="12" y2="3"></line>
-              <line x1="12" y1="21" x2="12" y2="23"></line>
-              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-              <line x1="1" y1="12" x2="3" y2="12"></line>
-              <line x1="21" y1="12" x2="23" y2="12"></line>
-              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
-              <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-            </svg>
-          </button>
-          
-          <div class="theme-dropdown">
-            <div class="theme-options">
-              <button class="theme-option" data-hue="165.37" title="Teal" aria-label="Teal theme">
-                <span class="theme-circle" style="background: oklch(0.50 0.13 165.37)"></span>
-              </button>
-              <button class="theme-option" data-hue="0" title="Gray" aria-label="Gray theme">
-                <span class="theme-circle" style="background: oklch(0.50 0.13 0)"></span>
-              </button>
-              <button class="theme-option" data-hue="31.08" title="Orange" aria-label="Orange theme">
-                <span class="theme-circle" style="background: oklch(0.50 0.13 31.08)"></span>
-              </button>
-              <button class="theme-option" data-hue="71.47" title="Yellow" aria-label="Yellow theme">
-                <span class="theme-circle" style="background: oklch(0.50 0.13 71.47)"></span>
-              </button>
-              <button class="theme-option" data-hue="120" title="Green" aria-label="Green theme">
-                <span class="theme-circle" style="background: oklch(0.50 0.13 120)"></span>
-              </button>
-              <button class="theme-option" data-hue="240" title="Blue" aria-label="Blue theme">
-                <span class="theme-circle" style="background: oklch(0.50 0.13 240)"></span>
-              </button>
-              <button class="theme-option" data-hue="280" title="Purple" aria-label="Purple theme">
-                <span class="theme-circle" style="background: oklch(0.50 0.13 280)"></span>
-              </button>
-              <button class="theme-option" data-hue="330" title="Pink" aria-label="Pink theme">
-                <span class="theme-circle" style="background: oklch(0.50 0.13 330)"></span>
-              </button>
-            </div>
-          </div>
-        </div>
         
         <div class="auth-slot">
           <div class="user-profile" style="display: none;">
@@ -103,6 +44,31 @@
                   </svg>
                   Admin Dashboard
                 </a>
+                <a href="/superadmin/dashboard" class="profile-link superadmin-link" style="display: none;">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                    <path d="M2 17l10 5 10-5"></path>
+                    <path d="M2 12l10 5 10-5"></path>
+                  </svg>
+                  Super Admin Dashboard
+                </a>
+                <div class="profile-divider role-switch-divider" style="display: none;"></div>
+                <div class="role-switch-section" style="display: none;">
+                  <div class="role-switch-label">Switch Role</div>
+                  <button class="profile-link role-switch-btn" data-role="student">
+                    👨‍🎓 Student
+                  </button>
+                  <button class="profile-link role-switch-btn" data-role="instructor">
+                    👨‍🏫 Instructor
+                  </button>
+                  <button class="profile-link role-switch-btn" data-role="admin">
+                    👨‍💼 Admin
+                  </button>
+                  <button class="profile-link role-switch-btn" data-role="super_admin">
+                    👑 Super Admin
+                  </button>
+                </div>
+                <div class="profile-divider"></div>
                 <button class="profile-link logout-btn" id="logout-btn">
                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
@@ -116,49 +82,6 @@
           </div>
         
           <a href="/login" class="login-btn">Login</a>
-        </div>
-          <button class="theme-btn" aria-label="Change theme color" aria-expanded="false" aria-haspopup="true">
-            <svg class="theme-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <circle cx="12" cy="12" r="5"></circle>
-              <line x1="12" y1="1" x2="12" y2="3"></line>
-              <line x1="12" y1="21" x2="12" y2="23"></line>
-              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-              <line x1="1" y1="12" x2="3" y2="12"></line>
-              <line x1="21" y1="12" x2="23" y2="12"></line>
-              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
-              <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-            </svg>
-          </button>
-          
-          <div class="theme-dropdown">
-            <div class="theme-options">
-              <button class="theme-option" data-hue="165.37" title="Teal" aria-label="Teal theme">
-                <span class="theme-circle" style="background: oklch(0.50 0.13 165.37)"></span>
-              </button>
-              <button class="theme-option" data-hue="0" title="Gray" aria-label="Gray theme">
-                <span class="theme-circle" style="background: oklch(0.50 0.13 0)"></span>
-              </button>
-              <button class="theme-option" data-hue="31.08" title="Orange" aria-label="Orange theme">
-                <span class="theme-circle" style="background: oklch(0.50 0.13 31.08)"></span>
-              </button>
-              <button class="theme-option" data-hue="71.47" title="Yellow" aria-label="Yellow theme">
-                <span class="theme-circle" style="background: oklch(0.50 0.13 71.47)"></span>
-              </button>
-              <button class="theme-option" data-hue="120" title="Green" aria-label="Green theme">
-                <span class="theme-circle" style="background: oklch(0.50 0.13 120)"></span>
-              </button>
-              <button class="theme-option" data-hue="240" title="Blue" aria-label="Blue theme">
-                <span class="theme-circle" style="background: oklch(0.50 0.13 240)"></span>
-              </button>
-              <button class="theme-option" data-hue="280" title="Purple" aria-label="Purple theme">
-                <span class="theme-circle" style="background: oklch(0.50 0.13 280)"></span>
-              </button>
-              <button class="theme-option" data-hue="330" title="Pink" aria-label="Pink theme">
-                <span class="theme-circle" style="background: oklch(0.50 0.13 330)"></span>
-              </button>
-            </div>
-          </div>
         </div>
       </div>
     </nav>
@@ -379,95 +302,6 @@
     color: var(--primary);
   }
 
-  /* Theme Selector */
-  .theme-selector {
-    position: relative;
-  }
-
-  .theme-btn {
-    background: none;
-    border: none;
-    color: var(--text-primary);
-    cursor: pointer;
-    padding: 0.5rem;
-    border-radius: var(--radius-sm);
-    transition: background 0.15s ease;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .theme-btn:hover {
-    background: var(--bg-secondary);
-  }
-
-  .theme-icon {
-    transition: transform 0.2s ease;
-    stroke: var(--primary);
-  }
-
-  .theme-btn:hover .theme-icon {
-    transform: rotate(45deg);
-  }
-
-  .theme-dropdown {
-    position: absolute;
-    top: calc(100% + 0.5rem);
-    right: 0;
-    background: var(--bg-primary);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    box-shadow: var(--shadow-lg);
-    opacity: 0;
-    visibility: hidden;
-    transition: opacity 0.15s ease, visibility 0.15s ease;
-    padding: 0.75rem;
-  }
-
-  @media (prefers-color-scheme: dark) {
-    .theme-dropdown {
-      background: var(--bg-secondary);
-    }
-  }
-
-  .theme-selector:hover .theme-dropdown {
-    opacity: 1;
-    visibility: visible;
-  }
-
-  .theme-options {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 0.5rem;
-  }
-
-  .theme-option {
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: 0.25rem;
-    border-radius: 50%;
-    transition: transform 0.15s ease;
-  }
-
-  .theme-option:hover {
-    transform: scale(1.1);
-  }
-
-  .theme-circle {
-    display: block;
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    border: 2px solid var(--border);
-    transition: border-color 0.15s ease, box-shadow 0.15s ease;
-  }
-
-  .theme-option:hover .theme-circle {
-    border-color: var(--text-primary);
-    box-shadow: 0 0 0 2px var(--bg-primary), 0 0 0 4px var(--border);
-  }
-
   /* Auth slot */
   .auth-slot {
     position: relative;
@@ -600,6 +434,27 @@
     color: oklch(0.577 0.245 27.325);
   }
 
+  .role-switch-section {
+    padding: 0.5rem 0;
+  }
+
+  .role-switch-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-secondary);
+    padding: 0.5rem 0.75rem;
+  }
+
+  .role-switch-btn {
+    justify-content: flex-start;
+  }
+
+  .role-switch-divider {
+    display: none;
+  }
+
   @media (max-width: 768px) {
     .nav-links {
       gap: 1rem;
@@ -619,52 +474,7 @@
 </style>
 
 <script is:inline>
-  // ─── Ultra-minimal header JS — all heavy work lazy-loaded on interaction ───
   (function(){
-    // Theme selector (event delegation, no per-element listeners)
-    var tc = document.querySelector('.theme-options');
-    if (tc) tc.addEventListener('click', function(e) {
-      var o = e.target.closest('.theme-option');
-      if (!o) return;
-      var h = o.getAttribute('data-hue');
-      if (!h) return;
-      var s = document.documentElement.style;
-      var d = window.matchMedia('(prefers-color-scheme:dark)').matches;
-      if (d) {
-        s.setProperty('--primary', 'oklch(0.72 0.12 ' + h + ')');
-        s.setProperty('--primary-hover', 'oklch(0.78 0.12 ' + h + ')');
-        s.setProperty('--primary-light', 'oklch(0.25 0.06 ' + h + ')');
-        s.setProperty('--primary-dark', 'oklch(0.82 0.10 ' + h + ')');
-      } else {
-        s.setProperty('--primary', 'oklch(0.35 0.08 ' + h + ')');
-        s.setProperty('--primary-hover', 'oklch(0.30 0.08 ' + h + ')');
-        s.setProperty('--primary-light', 'oklch(0.94 0.03 ' + h + ')');
-        s.setProperty('--primary-dark', 'oklch(0.22 0.06 ' + h + ')');
-      }
-      try { localStorage.setItem('theme-hue', h); } catch(e){}
-    });
-
-    // Lazy-load docs nav ONLY when user hovers on the Docs dropdown
-    var navLoaded = false;
-    var dd = document.querySelector('.dropdown');
-    if (dd) dd.addEventListener('mouseenter', function loadNav() {
-      if (navLoaded) return;
-      navLoaded = true;
-      fetch('/api/docs/nav').then(function(r){return r.json()}).then(function(d){
-        if (!d.success) return;
-        var el = document.getElementById('docs-nav-content');
-        if (!el) return;
-        var html = '';
-        d.categories.forEach(function(cat){
-          var docs = d.docsByCategory[cat];
-          html += '<div class="dropdown-section"><div class="dropdown-category">' + cat + '</div><div class="dropdown-items">';
-          docs.forEach(function(doc){ html += '<a href="/docs/' + doc.category + '/' + doc.slug + '" class="dropdown-item">' + doc.title + '</a>'; });
-          html += '</div></div>';
-        });
-        el.innerHTML = html;
-      }).catch(function(){});
-    }, {once: false});
-
     // Check auth state immediately on page load
     fetch('/api/auth/me', {credentials:'include'}).then(function(r){
       if (!r.ok) return null;
@@ -682,10 +492,22 @@
         if (pn) pn.textContent = d.user.email;
         if (pr) pr.textContent = d.user.role.replace('_', ' ');
         if (pa) pa.textContent = d.user.email.charAt(0).toUpperCase();
+        
+        // Show appropriate dashboard links
         var dl = up.querySelector('.dashboard-link');
         if (dl && (d.user.role === 'instructor' || d.user.role === 'super_admin')) dl.style.display = 'flex';
         var al = up.querySelector('.admin-link');
-        if (al && d.user.role === 'super_admin') al.style.display = 'flex';
+        if (al && (d.user.role === 'admin' || d.user.role === 'super_admin')) al.style.display = 'flex';
+        var sal = up.querySelector('.superadmin-link');
+        if (sal && d.user.role === 'super_admin') sal.style.display = 'flex';
+        
+        // Show role switching section only for super_admin
+        if (d.user.role === 'super_admin') {
+          var rss = up.querySelector('.role-switch-section');
+          var rsd = up.querySelector('.role-switch-divider');
+          if (rss) rss.style.display = 'block';
+          if (rsd) rsd.style.display = 'block';
+        }
       }
     }).catch(function(){});
 
@@ -693,6 +515,33 @@
     var lb = document.getElementById('logout-btn');
     if (lb) lb.addEventListener('click', function(){
       fetch('/api/auth/logout',{method:'POST'}).catch(function(){}).finally(function(){ window.location.href='/'; });
+    });
+
+    // Role switching
+    document.querySelectorAll('.role-switch-btn').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var targetRole = this.dataset.role;
+        if (!targetRole) return;
+        
+        if (!confirm('Switch to ' + targetRole.replace('_', ' ') + ' role?')) return;
+        
+        fetch('/api/auth/switch-role', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ targetRole: targetRole }),
+        }).then(function(r){
+          return r.json();
+        }).then(function(data){
+          if (data.success) {
+            window.location.reload();
+          } else {
+            alert('Error switching role: ' + data.error);
+          }
+        }).catch(function(err){
+          console.error('Role switch error:', err);
+          alert('Error switching role');
+        });
+      });
     });
   })();
 </script>

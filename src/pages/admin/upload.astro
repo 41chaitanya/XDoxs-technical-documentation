@@ -1,0 +1,245 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Header from '../../components/Header.astro';
+import { verifyToken } from '../../lib/auth/jwt';
+
+const token = Astro.cookies.get('auth_token')?.value;
+
+if (!token) {
+  return Astro.redirect('/login');
+}
+
+const payload = verifyToken(token);
+
+if (!payload || (payload.role !== 'admin' && payload.role !== 'super_admin')) {
+  return Astro.redirect('/login');
+}
+---
+
+<BaseLayout title="Upload Documentation - Admin" noindex={true}>
+  <Header />
+  
+  <div class="upload-container">
+    <div class="upload-header">
+      <h1>Upload Documentation</h1>
+      <p>Upload a markdown file to create new documentation</p>
+    </div>
+
+    <div class="upload-card">
+      <div class="upload-area" id="upload-area">
+        <svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+          <polyline points="17 8 12 3 7 8"></polyline>
+          <line x1="12" y1="3" x2="12" y2="15"></line>
+        </svg>
+        <h3>Drop your .md file here</h3>
+        <p>or click to browse</p>
+        <input type="file" id="file-input" accept=".md,.markdown" hidden />
+      </div>
+
+      <div id="file-info" class="file-info" style="display: none;">
+        <div class="file-details">
+          <span class="file-name" id="file-name"></span>
+          <button class="btn-remove" id="remove-file">✕</button>
+        </div>
+        <button class="btn-primary" id="process-btn">Process & Preview</button>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    .upload-container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 2rem;
+      min-height: calc(100vh - 65px);
+    }
+
+    .upload-header {
+      margin-bottom: 2rem;
+    }
+
+    .upload-header h1 {
+      font-size: 2rem;
+      margin-bottom: 0.5rem;
+      color: var(--text-primary);
+    }
+
+    .upload-header p {
+      color: var(--text-secondary);
+    }
+
+    .upload-card {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 2rem;
+    }
+
+    .upload-area {
+      border: 2px dashed var(--border);
+      border-radius: 12px;
+      padding: 3rem;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .upload-area:hover {
+      border-color: var(--primary);
+      background: var(--primary-light);
+    }
+
+    .upload-area.dragover {
+      border-color: var(--primary);
+      background: var(--primary-light);
+    }
+
+    .upload-area svg {
+      color: var(--primary);
+      margin-bottom: 1rem;
+    }
+
+    .upload-area h3 {
+      font-size: 1.25rem;
+      margin-bottom: 0.5rem;
+      color: var(--text-primary);
+    }
+
+    .upload-area p {
+      color: var(--text-secondary);
+    }
+
+    .file-info {
+      margin-top: 1.5rem;
+    }
+
+    .file-details {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem;
+      background: var(--bg-primary);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin-bottom: 1rem;
+    }
+
+    .file-name {
+      font-weight: 500;
+      color: var(--text-primary);
+    }
+
+    .btn-remove {
+      background: none;
+      border: none;
+      color: var(--text-secondary);
+      cursor: pointer;
+      font-size: 1.25rem;
+      padding: 0.25rem 0.5rem;
+      border-radius: 4px;
+      transition: all 0.2s ease;
+    }
+
+    .btn-remove:hover {
+      background: oklch(0.9 0.05 0 / 50%);
+      color: oklch(0.577 0.245 27.325);
+    }
+
+    .btn-primary {
+      width: 100%;
+      padding: 0.75rem;
+      background: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .btn-primary:hover {
+      background: var(--primary-hover);
+    }
+
+    .btn-primary:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  </style>
+
+  <script is:inline>
+    const uploadArea = document.getElementById('upload-area');
+    const fileInput = document.getElementById('file-input');
+    const fileInfo = document.getElementById('file-info');
+    const fileName = document.getElementById('file-name');
+    const removeBtn = document.getElementById('remove-file');
+    const processBtn = document.getElementById('process-btn');
+    let selectedFile = null;
+
+    // Click to upload
+    uploadArea.addEventListener('click', () => fileInput.click());
+
+    // File selection
+    fileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) handleFile(file);
+    });
+
+    // Drag and drop
+    uploadArea.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      uploadArea.classList.add('dragover');
+    });
+
+    uploadArea.addEventListener('dragleave', () => {
+      uploadArea.classList.remove('dragover');
+    });
+
+    uploadArea.addEventListener('drop', (e) => {
+      e.preventDefault();
+      uploadArea.classList.remove('dragover');
+      const file = e.dataTransfer.files[0];
+      if (file && (file.name.endsWith('.md') || file.name.endsWith('.markdown'))) {
+        handleFile(file);
+      } else {
+        alert('Please upload a .md or .markdown file');
+      }
+    });
+
+    function handleFile(file) {
+      selectedFile = file;
+      fileName.textContent = file.name;
+      uploadArea.style.display = 'none';
+      fileInfo.style.display = 'block';
+    }
+
+    removeBtn.addEventListener('click', () => {
+      selectedFile = null;
+      fileInput.value = '';
+      uploadArea.style.display = 'block';
+      fileInfo.style.display = 'none';
+    });
+
+    processBtn.addEventListener('click', async () => {
+      if (!selectedFile) return;
+
+      processBtn.disabled = true;
+      processBtn.textContent = 'Processing...';
+
+      try {
+        const content = await selectedFile.text();
+        
+        // Store in sessionStorage and redirect to preview
+        sessionStorage.setItem('mdContent', content);
+        sessionStorage.setItem('mdFileName', selectedFile.name);
+        window.location.href = '/admin/preview';
+      } catch (error) {
+        console.error('Error reading file:', error);
+        alert('Error reading file. Please try again.');
+        processBtn.disabled = false;
+        processBtn.textContent = 'Process & Preview';
+      }
+    });
+  </script>
+</BaseLayout>

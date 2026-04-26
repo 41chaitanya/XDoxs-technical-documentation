@@ -6,7 +6,7 @@ export interface User {
   email: string;
   passwordHash: string;
   fullName: string;
-  role: 'super_admin' | 'instructor' | 'student';
+  role: 'super_admin' | 'admin' | 'instructor' | 'student';
   createdAt: Date;
 }
 
@@ -49,9 +49,31 @@ export interface PublishedDoc {
   publishedBy: string; // Admin ID
 }
 
+export interface BlogPost {
+  _id?: ObjectId;
+  authorId: string;
+  authorEmail: string;
+  authorName: string;
+  title: string;
+  slug: string;
+  excerpt: string;
+  content: string; // Markdown content
+  coverImage?: string;
+  category: string; // tech category like 'javascript', 'react', etc.
+  tags: string[];
+  status: 'draft' | 'pending_review' | 'published' | 'rejected';
+  views: number;
+  likes: number;
+  feedback?: string; // Admin feedback
+  createdAt: Date;
+  updatedAt: Date;
+  publishedAt?: Date;
+}
+
 // Collections
 export const COLLECTIONS = {
   USERS: 'users',
   DOC_DRAFTS: 'doc_drafts',
   PUBLISHED_DOCS: 'published_docs',
+  BLOG_POSTS: 'blog_posts',
 } as const;

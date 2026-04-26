@@ -1,0 +1,190 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Header from '../components/Header.astro';
+import { getDb } from '../lib/db/mongodb';
+import { COLLECTIONS } from '../lib/db/models';
+
+export const prerender = true;
+
+const db = await getDb();
+const allDocs = await db.collection(COLLECTIONS.DOC_DRAFTS)
+  .find({ status: 'approved' })
+  .sort({ publishedAt: -1 })
+  .toArray();
+
+const categories = [...new Set(allDocs.map((doc: any) => doc.category))];
+const docsByCategory = categories.reduce((acc, cat) => {
+  acc[cat] = allDocs.filter((doc: any) => doc.category === cat);
+  return acc;
+}, {} as Record<string, any[]>);
+---
+
+<BaseLayout title="Learn - XDoxs" description="Explore comprehensive technical documentation and tutorials">
+  <Header />
+  
+  <main class="learn-page">
+    <div class="hero-section">
+      <div class="container">
+        <h1>Learn Technology In Depth</h1>
+        <p>Comprehensive documentation and tutorials to master programming</p>
+      </div>
+    </div>
+
+    <div class="container">
+      {categories.length === 0 ? (
+        <div class="empty-state">
+          <p>No documentation available yet. Check back soon!</p>
+        </div>
+      ) : (
+        categories.map(category => (
+          <section class="category-section">
+            <h2 class="category-title">{category}</h2>
+            <div class="docs-grid">
+              {docsByCategory[category].map((doc: any) => (
+                <a href={`/docs/${doc.category}/${doc.slug}`} class="doc-card">
+                  <h3>{doc.title}</h3>
+                  <p>{doc.description || 'Learn more about this topic'}</p>
+                  <div class="doc-meta">
+                    <span class="tag">{doc.category}</span>
+                    {doc.tags && doc.tags.slice(0, 2).map((tag: string) => (
+                      <span class="tag">{tag}</span>
+                    ))}
+                  </div>
+                </a>
+              ))}
+            </div>
+          </section>
+        ))
+      )}
+    </div>
+  </main>
+
+  <footer class="footer">
+    <div class="container">
+      <p>&copy; 2026 XDoxs by <a href="https://sheryians.com/" target="_blank">Sheryians Coding School</a></p>
+    </div>
+  </footer>
+</BaseLayout>
+
+<style>
+  .learn-page {
+    min-height: calc(100vh - 65px);
+    background: var(--bg-primary);
+  }
+
+  .hero-section {
+    background: linear-gradient(135deg, var(--primary-light), var(--bg-secondary));
+    padding: 4rem 0;
+    text-align: center;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .hero-section h1 {
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+    color: var(--text-primary);
+  }
+
+  .hero-section p {
+    font-size: 1.125rem;
+    color: var(--text-secondary);
+  }
+
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+  }
+
+  .category-section {
+    margin: 3rem 0;
+  }
+
+  .category-title {
+    font-size: 1.75rem;
+    margin-bottom: 1.5rem;
+    color: var(--text-primary);
+    text-transform: capitalize;
+    border-bottom: 2px solid var(--primary);
+    padding-bottom: 0.5rem;
+    display: inline-block;
+  }
+
+  .docs-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1.5rem;
+  }
+
+  .doc-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.5rem;
+    transition: all 0.2s ease;
+    display: block;
+    color: inherit;
+  }
+
+  .doc-card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-lg);
+    border-color: var(--primary);
+  }
+
+  .doc-card h3 {
+    font-size: 1.25rem;
+    margin-bottom: 0.75rem;
+    color: var(--text-primary);
+  }
+
+  .doc-card p {
+    color: var(--text-secondary);
+    margin-bottom: 1rem;
+    line-height: 1.6;
+  }
+
+  .doc-meta {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .tag {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.75rem;
+    background: var(--primary-light);
+    color: var(--primary);
+    border-radius: 999px;
+    font-weight: 500;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    color: var(--text-secondary);
+  }
+
+  .footer {
+    background: #1a1a1a;
+    color: white;
+    padding: 2rem 0;
+    text-align: center;
+    margin-top: 4rem;
+  }
+
+  .footer a {
+    color: var(--primary);
+    font-weight: 600;
+  }
+
+  @media (max-width: 768px) {
+    .hero-section h1 {
+      font-size: 2rem;
+    }
+
+    .docs-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

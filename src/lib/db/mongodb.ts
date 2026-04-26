@@ -6,7 +6,10 @@ declare global {
   var _mongoClientPromise: Promise<MongoClient> | undefined;
 }
 
-const MONGODB_URI = import.meta.env.MONGODB_URI || process.env.MONGODB_URI || 'mongodb://localhost:27017/xdoxs';
+// Handle both Astro (import.meta.env) and Node scripts (process.env)
+const MONGODB_URI = (typeof import.meta !== 'undefined' && import.meta.env?.MONGODB_URI) 
+  || process.env.MONGODB_URI 
+  || 'mongodb://localhost:27017/xdoxs';
 
 let client: MongoClient;
 let clientPromise: Promise<MongoClient>;

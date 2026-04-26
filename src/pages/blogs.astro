@@ -1,0 +1,273 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Header from '../components/Header.astro';
+import { getDb } from '../lib/db/mongodb';
+import { COLLECTIONS } from '../lib/db/models';
+
+export const prerender = false;
+
+const db = await getDb();
+const publishedBlogs = await db.collection(COLLECTIONS.BLOG_POSTS)
+  .find({ status: 'published' })
+  .sort({ publishedAt: -1 })
+  .toArray();
+
+// Top ranking (by views)
+const topBlogs = [...publishedBlogs].sort((a: any, b: any) => b.views - a.views).slice(0, 3);
+
+// Latest blogs
+const latestBlogs = publishedBlogs.slice(0, 6);
+
+// Categories
+const categories = [...new Set(publishedBlogs.map((blog: any) => blog.category))];
+---
+
+<BaseLayout title="Blogs - XDoxs" description="Read technical blogs and tutorials from our community">
+  <Header />
+  
+  <main class="blogs-page">
+    <div class="hero-section">
+      <div class="container">
+        <h1>Community Blogs</h1>
+        <p>Learn from experiences and insights shared by our community</p>
+      </div>
+    </div>
+
+    <div class="container">
+      {publishedBlogs.length === 0 ? (
+        <div class="empty-state">
+          <h2>No blogs yet</h2>
+          <p>Be the first to share your knowledge with the community!</p>
+        </div>
+      ) : (
+        <>
+          <!-- Top Ranking Blogs -->
+          {topBlogs.length > 0 && (
+            <section class="section">
+              <h2 class="section-title">🔥 Top Ranking</h2>
+              <div class="blogs-grid">
+                {topBlogs.map((blog: any) => (
+                  <article class="blog-card featured">
+                    <div class="blog-header">
+                      <span class="blog-category">{blog.category}</span>
+                      <span class="blog-views">👁️ {blog.views}</span>
+                    </div>
+                    <h3>{blog.title}</h3>
+                    <p>{blog.excerpt}</p>
+                    <div class="blog-footer">
+                      <span class="blog-author">By {blog.authorName}</span>
+                      <span class="blog-date">{new Date(blog.publishedAt).toLocaleDateString()}</span>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </section>
+          )}
+
+          <!-- Latest Blogs -->
+          <section class="section">
+            <h2 class="section-title">📝 Latest Blogs</h2>
+            <div class="blogs-grid">
+              {latestBlogs.map((blog: any) => (
+                <article class="blog-card">
+                  <div class="blog-header">
+                    <span class="blog-category">{blog.category}</span>
+                  </div>
+                  <h3>{blog.title}</h3>
+                  <p>{blog.excerpt}</p>
+                  <div class="blog-footer">
+                    <span class="blog-author">By {blog.authorName}</span>
+                    <span class="blog-date">{new Date(blog.publishedAt).toLocaleDateString()}</span>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
+
+          <!-- Category-wise Blogs -->
+          {categories.map(category => {
+            const categoryBlogs = publishedBlogs.filter((blog: any) => blog.category === category).slice(0, 3);
+            return categoryBlogs.length > 0 && (
+              <section class="section">
+                <h2 class="section-title">📚 {category}</h2>
+                <div class="blogs-grid">
+                  {categoryBlogs.map((blog: any) => (
+                    <article class="blog-card">
+                      <h3>{blog.title}</h3>
+                      <p>{blog.excerpt}</p>
+                      <div class="blog-footer">
+                        <span class="blog-author">By {blog.authorName}</span>
+                        <span class="blog-date">{new Date(blog.publishedAt).toLocaleDateString()}</span>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </section>
+            );
+          })}
+        </>
+      )}
+    </div>
+  </main>
+
+  <footer class="footer">
+    <div class="container">
+      <p>&copy; 2026 XDoxs by <a href="https://sheryians.com/" target="_blank">Sheryians Coding School</a></p>
+    </div>
+  </footer>
+</BaseLayout>
+
+<style>
+  .blogs-page {
+    min-height: calc(100vh - 65px);
+    background: var(--bg-primary);
+  }
+
+  .hero-section {
+    background: linear-gradient(135deg, var(--primary-light), var(--bg-secondary));
+    padding: 4rem 0;
+    text-align: center;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .hero-section h1 {
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+    color: var(--text-primary);
+  }
+
+  .hero-section p {
+    font-size: 1.125rem;
+    color: var(--text-secondary);
+  }
+
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+  }
+
+  .section {
+    margin: 3rem 0;
+  }
+
+  .section-title {
+    font-size: 1.75rem;
+    margin-bottom: 1.5rem;
+    color: var(--text-primary);
+  }
+
+  .blogs-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 1.5rem;
+  }
+
+  .blog-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.5rem;
+    transition: all 0.2s ease;
+    display: block;
+    color: inherit;
+  }
+
+  .blog-card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-lg);
+    border-color: var(--primary);
+  }
+
+  .blog-card.featured {
+    border-color: var(--primary);
+    background: var(--primary-light);
+  }
+
+  .blog-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+  }
+
+  .blog-category {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.75rem;
+    background: var(--primary);
+    color: white;
+    border-radius: 999px;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+
+  .blog-views {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+  }
+
+  .blog-card h3 {
+    font-size: 1.25rem;
+    margin-bottom: 0.75rem;
+    color: var(--text-primary);
+    line-height: 1.4;
+  }
+
+  .blog-card p {
+    color: var(--text-secondary);
+    margin-bottom: 1rem;
+    line-height: 1.6;
+  }
+
+  .blog-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
+  }
+
+  .blog-author {
+    font-weight: 500;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+  }
+
+  .empty-state h2 {
+    font-size: 2rem;
+    margin-bottom: 1rem;
+    color: var(--text-primary);
+  }
+
+  .empty-state p {
+    color: var(--text-secondary);
+  }
+
+  .footer {
+    background: #1a1a1a;
+    color: white;
+    padding: 2rem 0;
+    text-align: center;
+    margin-top: 4rem;
+  }
+
+  .footer a {
+    color: var(--primary);
+    font-weight: 600;
+  }
+
+  @media (max-width: 768px) {
+    .hero-section h1 {
+      font-size: 2rem;
+    }
+
+    .blogs-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
