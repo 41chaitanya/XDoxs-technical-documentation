@@ -52,22 +52,6 @@
                   </svg>
                   Super Admin Dashboard
                 </a>
-                <div class="profile-divider role-switch-divider" style="display: none;"></div>
-                <div class="role-switch-section" style="display: none;">
-                  <div class="role-switch-label">Switch Role</div>
-                  <button class="profile-link role-switch-btn" data-role="student">
-                    👨‍🎓 Student
-                  </button>
-                  <button class="profile-link role-switch-btn" data-role="instructor">
-                    👨‍🏫 Instructor
-                  </button>
-                  <button class="profile-link role-switch-btn" data-role="admin">
-                    👨‍💼 Admin
-                  </button>
-                  <button class="profile-link role-switch-btn" data-role="super_admin">
-                    👑 Super Admin
-                  </button>
-                </div>
                 <div class="profile-divider"></div>
                 <button class="profile-link logout-btn" id="logout-btn">
                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -434,27 +418,6 @@
     color: oklch(0.577 0.245 27.325);
   }
 
-  .role-switch-section {
-    padding: 0.5rem 0;
-  }
-
-  .role-switch-label {
-    font-size: 0.75rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--text-secondary);
-    padding: 0.5rem 0.75rem;
-  }
-
-  .role-switch-btn {
-    justify-content: flex-start;
-  }
-
-  .role-switch-divider {
-    display: none;
-  }
-
   @media (max-width: 768px) {
     .nav-links {
       gap: 1rem;
@@ -494,19 +457,20 @@
         if (pa) pa.textContent = d.user.email.charAt(0).toUpperCase();
         
         // Show appropriate dashboard links
-        var dl = up.querySelector('.dashboard-link');
-        if (dl && (d.user.role === 'instructor' || d.user.role === 'super_admin')) dl.style.display = 'flex';
-        var al = up.querySelector('.admin-link');
-        if (al && (d.user.role === 'admin' || d.user.role === 'super_admin')) al.style.display = 'flex';
-        var sal = up.querySelector('.superadmin-link');
-        if (sal && d.user.role === 'super_admin') sal.style.display = 'flex';
-        
-        // Show role switching section only for super_admin
         if (d.user.role === 'super_admin') {
-          var rss = up.querySelector('.role-switch-section');
-          var rsd = up.querySelector('.role-switch-divider');
-          if (rss) rss.style.display = 'block';
-          if (rsd) rsd.style.display = 'block';
+          // Super admin can see all dashboards
+          var dl = up.querySelector('.dashboard-link');
+          var al = up.querySelector('.admin-link');
+          var sal = up.querySelector('.superadmin-link');
+          if (dl) dl.style.display = 'flex';
+          if (al) al.style.display = 'flex';
+          if (sal) sal.style.display = 'flex';
+        } else if (d.user.role === 'admin') {
+          var al = up.querySelector('.admin-link');
+          if (al) al.style.display = 'flex';
+        } else if (d.user.role === 'instructor') {
+          var dl = up.querySelector('.dashboard-link');
+          if (dl) dl.style.display = 'flex';
         }
       }
     }).catch(function(){});
@@ -515,33 +479,6 @@
     var lb = document.getElementById('logout-btn');
     if (lb) lb.addEventListener('click', function(){
       fetch('/api/auth/logout',{method:'POST'}).catch(function(){}).finally(function(){ window.location.href='/'; });
-    });
-
-    // Role switching
-    document.querySelectorAll('.role-switch-btn').forEach(function(btn){
-      btn.addEventListener('click', function(){
-        var targetRole = this.dataset.role;
-        if (!targetRole) return;
-        
-        if (!confirm('Switch to ' + targetRole.replace('_', ' ') + ' role?')) return;
-        
-        fetch('/api/auth/switch-role', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ targetRole: targetRole }),
-        }).then(function(r){
-          return r.json();
-        }).then(function(data){
-          if (data.success) {
-            window.location.reload();
-          } else {
-            alert('Error switching role: ' + data.error);
-          }
-        }).catch(function(err){
-          console.error('Role switch error:', err);
-          alert('Error switching role');
-        });
-      });
     });
   })();
 </script>
