@@ -30,17 +30,56 @@ const userRole = payload.role;
     </div>
 
     <div class="info-section">
-      <div class="info-card">
-        <h2>📚 Documentation Access</h2>
-        <p>As an instructor, you can view all published documentation but cannot create or edit docs.</p>
-        <p>Documentation management is handled by Admins and Super Admins.</p>
-        <a href="/learn" class="btn-primary">Browse Documentation</a>
-      </div>
+      <div class="info-card guide-card">
+        <h2>✍️ Blog Writing Guidelines for SEO</h2>
+        <p>Follow these guidelines to create SEO-friendly blog posts that rank well</p>
+        
+        <div class="guide-section">
+          <h3>📝 Perfect Blog Structure</h3>
+          <ul>
+            <li><strong>Title:</strong> 50-60 characters, include main keyword</li>
+            <li><strong>Subtitle:</strong> 100-120 characters, expand on title</li>
+            <li><strong>Introduction:</strong> Hook reader, state problem, preview solution</li>
+            <li><strong>Main Content:</strong> 3-5 sections with H2 headings</li>
+            <li><strong>Conclusion:</strong> Summarize key points, call to action</li>
+          </ul>
+        </div>
 
-      <div class="info-card">
-        <h2>✍️ Blog Writing</h2>
-        <p>Write and publish blog posts to share your knowledge with the community.</p>
-        <p>Your blog posts will be reviewed by admins before being published.</p>
+        <div class="guide-section">
+          <h3>🎯 SEO Best Practices</h3>
+          <ul>
+            <li><strong>Keywords:</strong> Use main keyword in title and first paragraph</li>
+            <li><strong>Headings:</strong> Use H2 and H3 tags with keywords</li>
+            <li><strong>Length:</strong> Minimum 800 words (ideal: 1,500-2,500)</li>
+            <li><strong>Images:</strong> Add alt text, compress under 200KB</li>
+            <li><strong>Links:</strong> Use descriptive text, not "click here"</li>
+            <li><strong>Tags:</strong> Select 3-5 relevant tags</li>
+          </ul>
+        </div>
+
+        <div class="guide-section">
+          <h3>💻 Code Examples</h3>
+          <ul>
+            <li>Add comments explaining key parts</li>
+            <li>Use realistic variable names</li>
+            <li>Show complete, working examples</li>
+            <li>Specify language for syntax highlighting</li>
+          </ul>
+        </div>
+
+        <div class="guide-section">
+          <h3>✅ Pre-Publish Checklist</h3>
+          <ul>
+            <li>Title under 60 characters with keyword</li>
+            <li>Cover image added and optimized</li>
+            <li>3-5 tags selected</li>
+            <li>Proper heading structure (H2, H3)</li>
+            <li>All images have alt text</li>
+            <li>No spelling or grammar errors</li>
+            <li>Content is at least 800 words</li>
+          </ul>
+        </div>
+
         <a href="/instructor/write-blog" class="btn-primary">Write New Blog</a>
       </div>
     </div>
@@ -81,7 +120,7 @@ const userRole = payload.role;
 
     .info-section {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      grid-template-columns: 1fr;
       gap: 2rem;
       margin-top: 2rem;
     }
@@ -102,11 +141,42 @@ const userRole = payload.role;
     .info-card p {
       color: var(--text-secondary);
       line-height: 1.6;
-      margin-bottom: 1rem;
+      margin-bottom: 1.5rem;
     }
 
-    .info-card p:last-of-type {
+    .guide-card {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    .guide-section {
+      background: var(--bg-primary);
+      border-left: 3px solid var(--primary);
+      border-radius: 6px;
+      padding: 1.25rem;
       margin-bottom: 1.5rem;
+    }
+
+    .guide-section h3 {
+      font-size: 1.125rem;
+      color: var(--text-primary);
+      margin: 0 0 0.75rem 0;
+    }
+
+    .guide-section ul {
+      margin: 0;
+      padding-left: 1.5rem;
+      list-style: disc;
+    }
+
+    .guide-section li {
+      color: var(--text-secondary);
+      line-height: 1.7;
+      margin-bottom: 0.5rem;
+    }
+
+    .guide-section li strong {
+      color: var(--text-primary);
     }
 
     .btn-primary {
@@ -128,8 +198,16 @@ const userRole = payload.role;
     }
 
     @media (max-width: 768px) {
-      .info-section {
-        grid-template-columns: 1fr;
+      .dashboard-container {
+        padding: 1rem;
+      }
+
+      .info-card {
+        padding: 1.5rem;
+      }
+
+      .guide-section {
+        padding: 1rem;
       }
     }
   </style>

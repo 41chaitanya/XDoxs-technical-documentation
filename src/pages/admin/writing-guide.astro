@@ -1,0 +1,417 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Header from '../../components/Header.astro';
+import { verifyToken } from '../../lib/auth/jwt';
+
+const token = Astro.cookies.get('auth_token')?.value;
+if (!token) return Astro.redirect('/login');
+
+const payload = verifyToken(token);
+if (!payload || (payload.role !== 'admin' && payload.role !== 'super_admin')) {
+  return Astro.redirect('/login');
+}
+---
+
+<BaseLayout title="Documentation Writing Guide - Admin" noindex={true}>
+  <Header />
+  
+  <div class="guide-container">
+    <div class="guide-header">
+      <h1>📚 Documentation Writing Guide</h1>
+      <p>Follow these guidelines to create SEO-friendly, accessible documentation</p>
+    </div>
+
+    <div class="guide-content">
+      <!-- SEO Best Practices -->
+      <section class="guide-section">
+        <h2>🎯 SEO Best Practices</h2>
+        
+        <div class="tip-card success">
+          <h3>✅ DO: Use Proper Heading Hierarchy</h3>
+          <pre><code># Main Title (H1) - Only ONE per document
+
+## Section Heading (H2)
+Content about this section...
+
+### Subsection (H3)
+More detailed content...
+
+#### Sub-subsection (H4)
+Even more specific content...</code></pre>
+          <p><strong>Why:</strong> Search engines use headings to understand content structure. Proper hierarchy improves SEO rankings.</p>
+        </div>
+
+        <div class="tip-card error">
+          <h3>❌ DON'T: Skip Heading Levels</h3>
+          <pre><code># Title
+#### Subsection (WRONG - skipped H2 and H3)</code></pre>
+          <p><strong>Why:</strong> Breaks accessibility and confuses search engines.</p>
+        </div>
+      </section>
+
+      <!-- Image Optimization -->
+      <section class="guide-section">
+        <h2>🖼️ Image Optimization</h2>
+        
+        <div class="tip-card success">
+          <h3>✅ DO: Add Alt Text to Images</h3>
+          <pre><code>![Descriptive alt text explaining the image](image-url.jpg)</code></pre>
+          <p><strong>Why:</strong> Improves accessibility for screen readers and helps SEO.</p>
+        </div>
+
+        <div class="tip-card warning">
+          <h3>⚠️ Image Size Guidelines</h3>
+          <ul>
+            <li><strong>Max width:</strong> 1200px</li>
+            <li><strong>Format:</strong> WebP or JPEG (not PNG for photos)</li>
+            <li><strong>File size:</strong> Under 200KB per image</li>
+            <li><strong>Compress:</strong> Use tools like TinyPNG before uploading</li>
+          </ul>
+          <p><strong>Why:</strong> Large images slow down page load, hurting SEO and user experience.</p>
+        </div>
+      </section>
+
+      <!-- Links -->
+      <section class="guide-section">
+        <h2>🔗 Link Best Practices</h2>
+        
+        <div class="tip-card success">
+          <h3>✅ DO: Use Descriptive Link Text</h3>
+          <pre><code>Learn more about [JavaScript async/await](link-url)
+
+Read our [complete guide to React Hooks](link-url)</code></pre>
+          <p><strong>Why:</strong> Descriptive links help SEO and accessibility.</p>
+        </div>
+
+        <div class="tip-card error">
+          <h3>❌ DON'T: Use Generic Link Text</h3>
+          <pre><code>Click [here](link-url) to learn more
+Read more [here](link-url)</code></pre>
+          <p><strong>Why:</strong> "Click here" and "here" provide no context for search engines or screen readers.</p>
+        </div>
+      </section>
+
+      <!-- Content Structure -->
+      <section class="guide-section">
+        <h2>📋 Content Structure</h2>
+        
+        <div class="tip-card info">
+          <h3>Perfect Documentation Structure</h3>
+          <pre><code># Main Topic Title
+
+Brief introduction paragraph explaining what this documentation covers.
+
+## What You'll Learn
+- Key point 1
+- Key point 2
+- Key point 3
+
+## Prerequisites
+- Required knowledge
+- Required tools
+
+## Section 1: Getting Started
+
+### Step 1: Installation
+Detailed instructions...
+
+### Step 2: Configuration
+More instructions...
+
+## Section 2: Advanced Topics
+
+### Topic A
+Content...
+
+### Topic B
+Content...
+
+## Common Issues
+
+### Issue 1
+Solution...
+
+## Summary
+Brief recap of what was covered.
+
+## Next Steps
+- Link to related documentation
+- Link to advanced topics</code></pre>
+        </div>
+      </section>
+
+      <!-- Code Blocks -->
+      <section class="guide-section">
+        <h2>💻 Code Blocks</h2>
+        
+        <div class="tip-card success">
+          <h3>✅ DO: Use Language-Specific Code Blocks</h3>
+          <pre><code>```javascript
+const greeting = "Hello World";
+console.log(greeting);
+```
+
+```python
+greeting = "Hello World"
+print(greeting)
+```</code></pre>
+          <p><strong>Why:</strong> Enables syntax highlighting and improves readability.</p>
+        </div>
+
+        <div class="tip-card success">
+          <h3>✅ DO: Use Inline Code for Short Snippets</h3>
+          <pre><code>Use the `console.log()` function to print output.
+
+The `useState` hook manages component state.</code></pre>
+        </div>
+      </section>
+
+      <!-- Keywords -->
+      <section class="guide-section">
+        <h2>🔑 Keyword Optimization</h2>
+        
+        <div class="tip-card success">
+          <h3>✅ DO: Include Keywords Naturally</h3>
+          <ul>
+            <li>Use main keyword in H1 title</li>
+            <li>Use related keywords in H2 headings</li>
+            <li>Include keywords in first paragraph</li>
+            <li>Use keywords naturally throughout content</li>
+            <li>Add keywords to image alt text</li>
+          </ul>
+          <p><strong>Example:</strong> If documenting "React Hooks", use variations like "useState hook", "useEffect hook", "React Hook API"</p>
+        </div>
+
+        <div class="tip-card error">
+          <h3>❌ DON'T: Keyword Stuffing</h3>
+          <pre><code>React Hooks React Hooks React Hooks are React Hooks that help with React Hooks...</code></pre>
+          <p><strong>Why:</strong> Search engines penalize keyword stuffing. Write naturally for humans.</p>
+        </div>
+      </section>
+
+      <!-- Lists -->
+      <section class="guide-section">
+        <h2>📝 Lists and Formatting</h2>
+        
+        <div class="tip-card success">
+          <h3>✅ DO: Use Lists for Better Readability</h3>
+          <pre><code>## Benefits of React Hooks
+
+- Simpler code structure
+- Better code reusability
+- Easier state management
+- No class components needed
+
+## Installation Steps
+
+1. Install Node.js
+2. Create new project
+3. Install dependencies
+4. Start development server</code></pre>
+          <p><strong>Why:</strong> Lists improve scannability and SEO.</p>
+        </div>
+      </section>
+
+      <!-- Meta Information -->
+      <section class="guide-section">
+        <h2>📊 Meta Information</h2>
+        
+        <div class="tip-card info">
+          <h3>Required Fields</h3>
+          <ul>
+            <li><strong>Title:</strong> 50-60 characters, include main keyword</li>
+            <li><strong>Description:</strong> 150-160 characters, compelling summary</li>
+            <li><strong>Category:</strong> Choose appropriate category</li>
+            <li><strong>Tags:</strong> 3-5 relevant tags</li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- Quick Checklist -->
+      <section class="guide-section checklist">
+        <h2>✅ Pre-Publish Checklist</h2>
+        
+        <div class="checklist-items">
+          <label><input type="checkbox" /> Title is descriptive and under 60 characters</label>
+          <label><input type="checkbox" /> Description is compelling and under 160 characters</label>
+          <label><input type="checkbox" /> Only ONE H1 heading (main title)</label>
+          <label><input type="checkbox" /> Proper heading hierarchy (H1 → H2 → H3)</label>
+          <label><input type="checkbox" /> All images have descriptive alt text</label>
+          <label><input type="checkbox" /> Images are optimized (under 200KB each)</label>
+          <label><input type="checkbox" /> Links use descriptive text (not "click here")</label>
+          <label><input type="checkbox" /> Code blocks have language specified</label>
+          <label><input type="checkbox" /> Content is well-structured with sections</label>
+          <label><input type="checkbox" /> Keywords used naturally throughout</label>
+          <label><input type="checkbox" /> No spelling or grammar errors</label>
+          <label><input type="checkbox" /> Internal links to related documentation</label>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <style>
+    .guide-container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 2rem;
+      min-height: calc(100vh - 65px);
+    }
+
+    .guide-header {
+      margin-bottom: 3rem;
+      text-align: center;
+    }
+
+    .guide-header h1 {
+      font-size: 2.5rem;
+      color: var(--text-primary);
+      margin-bottom: 0.5rem;
+    }
+
+    .guide-header p {
+      font-size: 1.125rem;
+      color: var(--text-secondary);
+    }
+
+    .guide-content {
+      display: flex;
+      flex-direction: column;
+      gap: 3rem;
+    }
+
+    .guide-section {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 2rem;
+    }
+
+    .guide-section h2 {
+      font-size: 1.75rem;
+      color: var(--text-primary);
+      margin-bottom: 1.5rem;
+      padding-bottom: 0.75rem;
+      border-bottom: 2px solid var(--border);
+    }
+
+    .tip-card {
+      background: var(--bg-primary);
+      border-left: 4px solid var(--border);
+      border-radius: 8px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .tip-card:last-child {
+      margin-bottom: 0;
+    }
+
+    .tip-card.success {
+      border-left-color: oklch(0.65 0.15 145);
+      background: oklch(0.95 0.05 145 / 30%);
+    }
+
+    .tip-card.error {
+      border-left-color: oklch(0.577 0.245 27.325);
+      background: oklch(0.95 0.05 0 / 30%);
+    }
+
+    .tip-card.warning {
+      border-left-color: oklch(0.75 0.15 85);
+      background: oklch(0.95 0.05 85 / 30%);
+    }
+
+    .tip-card.info {
+      border-left-color: var(--primary);
+      background: var(--primary-light);
+    }
+
+    .tip-card h3 {
+      font-size: 1.125rem;
+      color: var(--text-primary);
+      margin-bottom: 1rem;
+    }
+
+    .tip-card p {
+      color: var(--text-secondary);
+      line-height: 1.6;
+      margin-bottom: 0.75rem;
+    }
+
+    .tip-card p:last-child {
+      margin-bottom: 0;
+    }
+
+    .tip-card ul {
+      margin: 1rem 0;
+      padding-left: 1.5rem;
+    }
+
+    .tip-card li {
+      color: var(--text-secondary);
+      margin-bottom: 0.5rem;
+      line-height: 1.6;
+    }
+
+    .tip-card pre {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 1rem;
+      overflow-x: auto;
+      margin: 1rem 0;
+    }
+
+    .tip-card code {
+      font-family: 'Courier New', monospace;
+      font-size: 0.875rem;
+      line-height: 1.6;
+      color: var(--text-primary);
+    }
+
+    .checklist-items {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .checklist-items label {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.75rem;
+      background: var(--bg-primary);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+      color: var(--text-primary);
+      font-size: 0.9rem;
+    }
+
+    .checklist-items label:hover {
+      background: var(--bg-tertiary);
+      border-color: var(--primary);
+    }
+
+    .checklist-items input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+    }
+
+    @media (max-width: 768px) {
+      .guide-container {
+        padding: 1rem;
+      }
+
+      .guide-header h1 {
+        font-size: 2rem;
+      }
+
+      .guide-section {
+        padding: 1.5rem;
+      }
+    }
+  </style>
+</BaseLayout>

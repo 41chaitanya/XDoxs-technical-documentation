@@ -76,11 +76,73 @@ const nextUrl = hasNext ? `?tab=${validTabIndex + 1}` : null;
 
 <BaseLayout 
   title={`${currentTab.title} - ${draft.title}`}
-  description={draft.description || ''}
+  description={draft.description || `Learn about ${currentTab.title} in this comprehensive guide.`}
   article={true}
   publishedTime={publishedAt.toISOString()}
+  minimal={true}
 >
   <Header />
+  
+  <!-- Structured Data for Article -->
+  <script type="application/ld+json" set:html={JSON.stringify({
+    '@context': 'https://schema.org',
+    '@type': 'TechArticle',
+    headline: currentTab.title,
+    description: draft.description || `Learn about ${currentTab.title}`,
+    author: {
+      '@type': 'Person',
+      name: draft.instructorEmail.split('@')[0]
+    },
+    datePublished: publishedAt.toISOString(),
+    dateModified: new Date(draft.updatedAt).toISOString(),
+    publisher: {
+      '@type': 'Organization',
+      name: 'XDoxs',
+      logo: {
+        '@type': 'ImageObject',
+        url: `${Astro.site}favicon.svg`
+      }
+    },
+    mainEntityOfPage: {
+      '@type': 'WebPage',
+      '@id': Astro.url.href
+    },
+    keywords: draft.tags?.join(', ') || category,
+    articleSection: category,
+    inLanguage: 'en-US'
+  })} />
+
+  <!-- Breadcrumb Structured Data -->
+  <script type="application/ld+json" set:html={JSON.stringify({
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      {
+        '@type': 'ListItem',
+        position: 1,
+        name: 'Home',
+        item: Astro.site?.toString()
+      },
+      {
+        '@type': 'ListItem',
+        position: 2,
+        name: 'Documentation',
+        item: `${Astro.site}learn`
+      },
+      {
+        '@type': 'ListItem',
+        position: 3,
+        name: category,
+        item: `${Astro.site}docs/${category}`
+      },
+      {
+        '@type': 'ListItem',
+        position: 4,
+        name: draft.title,
+        item: Astro.url.href
+      }
+    ]
+  })} />
   
   <div class="docs-container">
     <!-- Left Sidebar: Tabs Navigation -->

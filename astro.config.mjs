@@ -37,7 +37,8 @@ export default defineConfig({
   // Build optimizations
   compressHTML: true,
   build: {
-    inlineStylesheets: 'always',
+    inlineStylesheets: 'auto',
+    assets: '_astro',
   },
   vite: {
     build: {
@@ -49,8 +50,21 @@ export default defineConfig({
       rollupOptions: {
         output: {
           manualChunks: undefined,
+          // Optimize asset file names
+          assetFileNames: 'assets/[name].[hash][extname]',
+          chunkFileNames: 'chunks/[name].[hash].js',
+          entryFileNames: 'entry/[name].[hash].js',
         },
       },
+      // Target modern browsers for smaller bundles
+      target: 'es2020',
+      // Reduce chunk size warnings
+      chunkSizeWarningLimit: 1000,
+    },
+    // Optimize dependencies
+    optimizeDeps: {
+      include: [],
+      exclude: [],
     },
   },
 });

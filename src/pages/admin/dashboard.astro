@@ -28,6 +28,9 @@ const userRole = payload.role;
         <p class="user-info">Welcome, {userEmail} ({userRole})</p>
       </div>
       <div class="header-actions">
+        <a href="/admin/writing-guide" class="btn-secondary">
+          <span class="icon">📚</span> Writing Guide
+        </a>
         <a href="/admin/upload" class="btn-primary">
           <span class="icon">↑</span> Upload Documentation
         </a>
@@ -100,6 +103,26 @@ const userRole = payload.role;
 
     .btn-primary:hover {
       background: var(--primary-hover);
+      transform: translateY(-2px);
+    }
+
+    .btn-secondary {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.75rem 1.5rem;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      text-decoration: none;
+      border-radius: 8px;
+      font-weight: 500;
+      transition: all 0.2s;
+      border: 1px solid var(--border);
+    }
+
+    .btn-secondary:hover {
+      background: var(--bg-tertiary);
+      border-color: var(--primary);
       transform: translateY(-2px);
     }
 

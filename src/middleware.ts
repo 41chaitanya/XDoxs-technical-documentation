@@ -21,7 +21,6 @@ const PUBLIC_ROUTES = [
   '/docs',
   '/learn',
   '/blogs',
-  '/community',
   '/api/auth/login',
   '/api/auth/register',
   '/api/auth/logout',

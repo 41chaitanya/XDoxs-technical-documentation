@@ -11,8 +11,6 @@
       <div class="nav-links">
         <a href="/learn">Learn</a>
         <a href="/blogs">Blogs</a>
-        <a href="/community">Community</a>
-        <a href="https://github.com/yourusername/xdoxs" target="_blank" rel="noopener noreferrer" aria-label="GitHub (opens in new tab)">GitHub</a>
         
         <div class="auth-slot">
           <div class="user-profile" style="display: none;">
@@ -436,49 +434,61 @@
   }
 </style>
 
-<script is:inline>
-  (function(){
-    // Check auth state immediately on page load
-    fetch('/api/auth/me', {credentials:'include'}).then(function(r){
-      if (!r.ok) return null;
-      return r.json();
-    }).then(function(d){
-      if (!d || !d.user) return;
-      var lb = document.querySelector('.login-btn');
-      var up = document.querySelector('.user-profile');
-      if (lb) lb.style.display = 'none';
-      if (up) {
-        up.style.display = 'block';
-        var pn = up.querySelector('.profile-name');
-        var pr = up.querySelector('.profile-role');
-        var pa = up.querySelector('.profile-avatar');
-        if (pn) pn.textContent = d.user.email;
-        if (pr) pr.textContent = d.user.role.replace('_', ' ');
-        if (pa) pa.textContent = d.user.email.charAt(0).toUpperCase();
-        
-        // Show appropriate dashboard links
-        if (d.user.role === 'super_admin') {
-          // Super admin can see all dashboards
-          var dl = up.querySelector('.dashboard-link');
-          var al = up.querySelector('.admin-link');
-          var sal = up.querySelector('.superadmin-link');
-          if (dl) dl.style.display = 'flex';
-          if (al) al.style.display = 'flex';
-          if (sal) sal.style.display = 'flex';
-        } else if (d.user.role === 'admin') {
-          var al = up.querySelector('.admin-link');
-          if (al) al.style.display = 'flex';
-        } else if (d.user.role === 'instructor') {
-          var dl = up.querySelector('.dashboard-link');
-          if (dl) dl.style.display = 'flex';
-        }
+<script>
+  // Check auth state on page load - optimized version
+  (async function() {
+    try {
+      const response = await fetch('/api/auth/me', { credentials: 'include' });
+      if (!response.ok) return;
+      
+      const data = await response.json();
+      if (!data?.user) return;
+      
+      const loginBtn = document.querySelector('.login-btn');
+      const userProfile = document.querySelector('.user-profile');
+      
+      if (loginBtn) loginBtn.style.display = 'none';
+      if (!userProfile) return;
+      
+      userProfile.style.display = 'block';
+      
+      // Update profile info
+      const profileName = userProfile.querySelector('.profile-name');
+      const profileRole = userProfile.querySelector('.profile-role');
+      const profileAvatar = userProfile.querySelector('.profile-avatar');
+      
+      if (profileName) profileName.textContent = data.user.email;
+      if (profileRole) profileRole.textContent = data.user.role.replace('_', ' ');
+      if (profileAvatar) profileAvatar.textContent = data.user.email.charAt(0).toUpperCase();
+      
+      // Show appropriate dashboard links based on role
+      const dashboardLink = userProfile.querySelector('.dashboard-link');
+      const adminLink = userProfile.querySelector('.admin-link');
+      const superAdminLink = userProfile.querySelector('.superadmin-link');
+      
+      if (data.user.role === 'super_admin') {
+        if (dashboardLink) dashboardLink.style.display = 'flex';
+        if (adminLink) adminLink.style.display = 'flex';
+        if (superAdminLink) superAdminLink.style.display = 'flex';
+      } else if (data.user.role === 'admin') {
+        if (adminLink) adminLink.style.display = 'flex';
+      } else if (data.user.role === 'instructor') {
+        if (dashboardLink) dashboardLink.style.display = 'flex';
       }
-    }).catch(function(){});
-
-    // Logout
-    var lb = document.getElementById('logout-btn');
-    if (lb) lb.addEventListener('click', function(){
-      fetch('/api/auth/logout',{method:'POST'}).catch(function(){}).finally(function(){ window.location.href='/'; });
-    });
+    } catch (error) {
+      // Silently fail - user not logged in
+    }
   })();
+
+  // Logout handler
+  const logoutBtn = document.getElementById('logout-btn');
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', async () => {
+      try {
+        await fetch('/api/auth/logout', { method: 'POST' });
+      } finally {
+        window.location.href = '/';
+      }
+    });
+  }
 </script>

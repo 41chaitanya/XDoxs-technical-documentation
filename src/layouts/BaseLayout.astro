@@ -48,18 +48,18 @@ const websiteSchema = {
 ---
 
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" dir="ltr">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    
-    <!-- Preconnect for performance -->
-    <link rel="dns-prefetch" href="https://sheryians.com" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/favicon.svg" />
     {!minimal && <link rel="manifest" href="/manifest.json" />}
-    <meta name="theme-color" content="#0d9488" />
+    <meta name="theme-color" content="#004D36" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#5AC8A5" media="(prefers-color-scheme: dark)" />
     <meta name="color-scheme" content="light dark" />
     
     <!-- SEO Meta Tags -->
@@ -111,6 +111,6 @@ const websiteSchema = {
   </head>
   <body>
     <slot />
-    {!minimal && <script is:inline src="/dialog.js" defer></script>}
+    {!minimal && <script src="/dialog.js" defer></script>}
   </body>
 </html>
