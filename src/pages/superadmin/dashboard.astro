@@ -356,8 +356,11 @@ const userEmail = payload.email;
         const statusLabel = draft.status === 'pending_review' ? 'Pending Review' : 
                            draft.status === 'approved' ? 'Approved' : 'Rejected';
         
+        const isUpdate = draft.status === 'pending_review' && draft.publishedAt;
+        const updateBadge = isUpdate ? '<span style="background: oklch(0.9 0.15 31.08); color: oklch(0.3 0.1 31.08); padding: 0.25rem 0.5rem; border-radius: 12px; font-size: 0.7rem; font-weight: 600; margin-left: 0.5rem;">UPDATE</span>' : '';
+        
         const reviewBtn = draft.status === 'pending_review' 
-          ? `<a href="/admin/review/${draft._id}" class="btn btn-primary">📝 Review</a>`
+          ? `<a href="/admin/review/${draft._id}" class="btn btn-primary">📝 Review${isUpdate ? ' Update' : ''}</a>`
           : '';
         
         const deleteBtn = `<button class="btn btn-danger" onclick="deleteDoc('${draft._id}')">🗑️ Delete</button>`;
@@ -370,11 +373,12 @@ const userEmail = payload.email;
           <div class="doc-card">
             <div class="doc-header">
               <div class="doc-info">
-                <h3 class="doc-title">${draft.title}</h3>
+                <h3 class="doc-title">${draft.title}${updateBadge}</h3>
                 <div class="doc-meta">
                   <span>👤 ${draft.instructorEmail}</span>
                   <span>📁 ${draft.category}</span>
                   <span>📅 ${new Date(draft.updatedAt).toLocaleDateString()}</span>
+                  ${isUpdate ? '<span style="color: var(--primary); font-weight: 600;">🔄 Content Updated</span>' : ''}
                 </div>
               </div>
               <span class="doc-status status-${draft.status}">${statusLabel}</span>

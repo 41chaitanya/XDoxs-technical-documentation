@@ -1,0 +1,642 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import Header from '../../../components/Header.astro';
+import { getDocDraft } from '../../../lib/db/docs';
+
+const { id } = Astro.params;
+
+if (!id) {
+  return Astro.redirect('/admin/dashboard');
+}
+
+const draft = await getDocDraft(id);
+
+if (!draft) {
+  return Astro.redirect('/admin/dashboard');
+}
+---
+
+<BaseLayout title={`Manage: ${draft.title}`} noindex={true}>
+  <Header />
+  
+  <div class="manage-container">
+    <div class="manage-header">
+      <div>
+        <h1>Manage Documentation</h1>
+        <p class="doc-info">
+          <strong>{draft.title}</strong> • Category: {draft.category}
+        </p>
+      </div>
+      <div class="header-actions">
+        <button class="btn btn-secondary" id="cancel-btn">Cancel</button>
+        <button class="btn btn-primary" id="save-btn">Save & Submit for Review</button>
+      </div>
+    </div>
+
+    <div class="manage-layout">
+      <!-- Left: Tabs List -->
+      <aside class="tabs-sidebar">
+        <div class="sidebar-header">
+          <h2>Tabs ({draft.tabs?.length || 0})</h2>
+          <button class="btn-add" id="add-tab-btn">+ Add Tab</button>
+        </div>
+        
+        <div class="tabs-list" id="tabs-list">
+          <!-- Tabs will be rendered here -->
+        </div>
+      </aside>
+
+      <!-- Right: Tab Editor -->
+      <main class="editor-main">
+        <div id="no-tab-selected" class="empty-state">
+          <p>Select a tab to edit or add a new one</p>
+        </div>
+
+        <div id="tab-editor" class="tab-editor" style="display: none;">
+          <div class="editor-header">
+            <input type="text" id="tab-title" placeholder="Tab Title" class="title-input" />
+            <button class="btn-delete" id="delete-tab-btn">🗑️ Delete Tab</button>
+          </div>
+          
+          <textarea id="tab-content" placeholder="Write your markdown content here..."></textarea>
+          
+          <div class="editor-actions">
+            <button class="btn btn-secondary" id="preview-btn">Preview</button>
+          </div>
+        </div>
+
+        <div id="tab-preview" class="tab-preview" style="display: none;">
+          <div class="preview-header">
+            <h3>Preview</h3>
+            <button class="btn btn-secondary" id="back-to-editor-btn">Back to Editor</button>
+          </div>
+          <div class="preview-content" id="preview-content"></div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <!-- Add Tab Modal -->
+  <div id="add-tab-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+      <h3>Add New Tab</h3>
+      <p>Upload a markdown file to create a new tab</p>
+      
+      <div class="upload-area-small" id="modal-upload-area">
+        <p>Drop .md file here or click to browse</p>
+        <input type="file" id="modal-file-input" accept=".md,.markdown" hidden />
+      </div>
+      
+      <div class="modal-actions">
+        <button class="btn btn-secondary" id="modal-cancel-btn">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    .manage-container {
+      max-width: 1600px;
+      margin: 0 auto;
+      padding: 2rem;
+      min-height: calc(100vh - 65px);
+    }
+
+    .manage-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 2rem;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    .manage-header h1 {
+      font-size: 1.75rem;
+      color: var(--text-primary);
+      margin: 0;
+    }
+
+    .doc-info {
+      color: var(--text-secondary);
+      margin: 0.5rem 0 0 0;
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 0.75rem;
+    }
+
+    .manage-layout {
+      display: grid;
+      grid-template-columns: 300px 1fr;
+      gap: 2rem;
+      min-height: 600px;
+    }
+
+    .tabs-sidebar {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem;
+      height: fit-content;
+      position: sticky;
+      top: 80px;
+    }
+
+    .sidebar-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+
+    .sidebar-header h2 {
+      font-size: 1.125rem;
+      color: var(--text-primary);
+      margin: 0;
+    }
+
+    .btn-add {
+      padding: 0.5rem 0.75rem;
+      background: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.875rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-add:hover {
+      background: var(--primary-hover);
+    }
+
+    .tabs-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .tab-item {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.75rem;
+      background: var(--bg-primary);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .tab-item:hover {
+      border-color: var(--primary);
+    }
+
+    .tab-item.active {
+      border-color: var(--primary);
+      background: var(--primary-light);
+    }
+
+    .tab-drag-handle {
+      cursor: grab;
+      color: var(--text-secondary);
+      font-size: 1.25rem;
+    }
+
+    .tab-drag-handle:active {
+      cursor: grabbing;
+    }
+
+    .tab-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .tab-title {
+      font-weight: 500;
+      color: var(--text-primary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .tab-order {
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+    }
+
+    .editor-main {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 2rem;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 4rem 2rem;
+      color: var(--text-secondary);
+    }
+
+    .tab-editor {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+
+    .editor-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+      gap: 1rem;
+    }
+
+    .title-input {
+      flex: 1;
+      padding: 0.75rem;
+      background: var(--bg-primary);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text-primary);
+      font-size: 1.125rem;
+      font-weight: 600;
+    }
+
+    .title-input:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+
+    .btn-delete {
+      padding: 0.5rem 1rem;
+      background: oklch(0.577 0.245 27.325);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.875rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-delete:hover {
+      background: oklch(0.5 0.25 27.325);
+    }
+
+    #tab-content {
+      flex: 1;
+      width: 100%;
+      padding: 1rem;
+      background: var(--bg-primary);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text-primary);
+      font-family: 'Courier New', monospace;
+      font-size: 0.9rem;
+      line-height: 1.6;
+      resize: vertical;
+      min-height: 500px;
+    }
+
+    #tab-content:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+
+    .editor-actions {
+      margin-top: 1rem;
+      display: flex;
+      justify-content: flex-end;
+    }
+
+    .tab-preview {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+
+    .preview-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+
+    .preview-header h3 {
+      margin: 0;
+      color: var(--text-primary);
+    }
+
+    .preview-content {
+      flex: 1;
+      padding: 2rem;
+      background: var(--bg-primary);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow-y: auto;
+      line-height: 1.7;
+      color: var(--text-primary);
+    }
+
+    .btn {
+      padding: 0.75rem 1.5rem;
+      border: none;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: var(--primary-hover);
+    }
+
+    .btn-secondary {
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      border: 1px solid var(--border);
+    }
+
+    .btn-secondary:hover {
+      background: var(--bg-tertiary);
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    /* Modal */
+    .modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: oklch(0 0 0 / 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .modal-content {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 2rem;
+      max-width: 500px;
+      width: 90%;
+    }
+
+    .modal-content h3 {
+      margin: 0 0 0.5rem 0;
+      color: var(--text-primary);
+    }
+
+    .modal-content p {
+      color: var(--text-secondary);
+      margin-bottom: 1.5rem;
+    }
+
+    .upload-area-small {
+      border: 2px dashed var(--border);
+      border-radius: 8px;
+      padding: 2rem;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-bottom: 1.5rem;
+    }
+
+    .upload-area-small:hover {
+      border-color: var(--primary);
+      background: var(--primary-light);
+    }
+
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.75rem;
+    }
+
+    @media (max-width: 1024px) {
+      .manage-layout {
+        grid-template-columns: 1fr;
+      }
+
+      .tabs-sidebar {
+        position: static;
+      }
+    }
+  </style>
+
+  <script is:inline define:vars={{ draftId: id, initialTabs: draft.tabs || [] }}>
+    let tabs = JSON.parse(JSON.stringify(initialTabs));
+    let currentTabIndex = -1;
+    let hasChanges = false;
+
+    function renderTabsList() {
+      const tabsList = document.getElementById('tabs-list');
+      
+      if (tabs.length === 0) {
+        tabsList.innerHTML = '<div class="empty-state"><p>No tabs yet</p></div>';
+        return;
+      }
+
+      tabsList.innerHTML = tabs.map((tab, index) => `
+        <div class="tab-item ${index === currentTabIndex ? 'active' : ''}" data-index="${index}">
+          <span class="tab-drag-handle">⋮⋮</span>
+          <div class="tab-info">
+            <div class="tab-title">${tab.title}</div>
+            <div class="tab-order">Tab ${index + 1}</div>
+          </div>
+        </div>
+      `).join('');
+
+      // Add click handlers
+      document.querySelectorAll('.tab-item').forEach(item => {
+        item.addEventListener('click', function() {
+          selectTab(parseInt(this.dataset.index));
+        });
+      });
+    }
+
+    function selectTab(index) {
+      if (index < 0 || index >= tabs.length) return;
+      
+      currentTabIndex = index;
+      const tab = tabs[index];
+      
+      document.getElementById('no-tab-selected').style.display = 'none';
+      document.getElementById('tab-editor').style.display = 'flex';
+      document.getElementById('tab-preview').style.display = 'none';
+      
+      document.getElementById('tab-title').value = tab.title;
+      document.getElementById('tab-content').value = tab.content;
+      
+      renderTabsList();
+    }
+
+    // Track changes
+    document.getElementById('tab-title')?.addEventListener('input', function() {
+      if (currentTabIndex >= 0) {
+        tabs[currentTabIndex].title = this.value;
+        hasChanges = true;
+        renderTabsList();
+      }
+    });
+
+    document.getElementById('tab-content')?.addEventListener('input', function() {
+      if (currentTabIndex >= 0) {
+        tabs[currentTabIndex].content = this.value;
+        hasChanges = true;
+      }
+    });
+
+    // Delete tab
+    document.getElementById('delete-tab-btn')?.addEventListener('click', function() {
+      if (currentTabIndex < 0) return;
+      
+      if (!confirm('Delete this tab?')) return;
+      
+      tabs.splice(currentTabIndex, 1);
+      currentTabIndex = -1;
+      hasChanges = true;
+      
+      document.getElementById('tab-editor').style.display = 'none';
+      document.getElementById('no-tab-selected').style.display = 'block';
+      
+      renderTabsList();
+    });
+
+    // Preview
+    document.getElementById('preview-btn')?.addEventListener('click', async function() {
+      const content = document.getElementById('tab-content').value;
+      
+      document.getElementById('tab-editor').style.display = 'none';
+      document.getElementById('tab-preview').style.display = 'flex';
+      
+      try {
+        const response = await fetch('/api/docs/render-preview', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content }),
+        });
+        
+        const data = await response.json();
+        if (data.success) {
+          document.getElementById('preview-content').innerHTML = data.html;
+        }
+      } catch (error) {
+        console.error('Error:', error);
+      }
+    });
+
+    document.getElementById('back-to-editor-btn')?.addEventListener('click', function() {
+      document.getElementById('tab-preview').style.display = 'none';
+      document.getElementById('tab-editor').style.display = 'flex';
+    });
+
+    // Add tab modal
+    document.getElementById('add-tab-btn')?.addEventListener('click', function() {
+      document.getElementById('add-tab-modal').style.display = 'flex';
+    });
+
+    document.getElementById('modal-cancel-btn')?.addEventListener('click', function() {
+      document.getElementById('add-tab-modal').style.display = 'none';
+    });
+
+    const modalUploadArea = document.getElementById('modal-upload-area');
+    const modalFileInput = document.getElementById('modal-file-input');
+
+    modalUploadArea?.addEventListener('click', () => modalFileInput.click());
+
+    modalFileInput?.addEventListener('change', async function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      
+      const content = await file.text();
+      const heading = extractFirstH1(content);
+      
+      tabs.push({
+        id: `tab-${tabs.length + 1}`,
+        title: heading,
+        content: content,
+        order: tabs.length + 1
+      });
+      
+      hasChanges = true;
+      renderTabsList();
+      selectTab(tabs.length - 1);
+      
+      document.getElementById('add-tab-modal').style.display = 'none';
+      this.value = '';
+    });
+
+    function extractFirstH1(markdown) {
+      const lines = markdown.split('\n');
+      for (const line of lines) {
+        const match = line.match(/^#\s+(.+)$/);
+        if (match) return match[1].trim();
+      }
+      return 'Untitled';
+    }
+
+    // Cancel
+    document.getElementById('cancel-btn')?.addEventListener('click', function() {
+      if (hasChanges && !confirm('Discard changes?')) return;
+      window.location.href = '/admin/dashboard';
+    });
+
+    // Save
+    document.getElementById('save-btn')?.addEventListener('click', async function() {
+      if (tabs.length === 0) {
+        alert('Add at least one tab');
+        return;
+      }
+      
+      this.disabled = true;
+      this.textContent = 'Saving...';
+      
+      try {
+        const response = await fetch('/api/admin/update-tabs', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            draftId: draftId,
+            tabs: tabs
+          })
+        });
+        
+        const data = await response.json();
+        if (data.success) {
+          alert('Documentation updated and submitted for review!');
+          window.location.href = '/admin/dashboard';
+        } else {
+          alert('Error: ' + data.error);
+          this.disabled = false;
+          this.textContent = 'Save & Submit for Review';
+        }
+      } catch (error) {
+        console.error('Error:', error);
+        alert('Error saving documentation');
+        this.disabled = false;
+        this.textContent = 'Save & Submit for Review';
+      }
+    });
+
+    // Initial render
+    renderTabsList();
+    if (tabs.length > 0) {
+      selectTab(0);
+    }
+  </script>
+</BaseLayout>

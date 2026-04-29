@@ -11,7 +11,7 @@ if (!token) {
 
 const payload = verifyToken(token);
 
-if (!payload || (payload.role !== 'admin' && payload.role !== 'super_admin')) {
+if (!payload || payload.role !== 'admin' && payload.role !== 'super_admin') {
   return Astro.redirect('/login');
 }
 

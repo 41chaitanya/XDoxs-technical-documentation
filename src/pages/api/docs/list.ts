@@ -26,7 +26,7 @@ export const GET: APIRoute = async ({ cookies }) => {
     
     if (payload.role === 'super_admin') {
       drafts = await getAllDrafts();
-    } else if (payload.role === 'admin' || payload.role === 'instructor') {
+    } else if (payload.role === 'admin') {
       drafts = await getInstructorDrafts(payload.userId);
     } else {
       return new Response(JSON.stringify({ error: 'Forbidden' }), {

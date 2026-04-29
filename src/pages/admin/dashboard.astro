@@ -11,7 +11,7 @@ if (!token) {
 
 const payload = verifyToken(token);
 
-if (!payload || (payload.role !== 'admin' && payload.role !== 'super_admin')) {
+if (!payload || payload.role !== 'admin' && payload.role !== 'super_admin') {
   return Astro.redirect('/login');
 }
 
@@ -204,6 +204,24 @@ const userRole = payload.role;
       padding: 3rem;
       color: var(--text-secondary);
     }
+
+    .btn-edit {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1rem;
+      background: var(--primary);
+      color: white;
+      text-decoration: none;
+      border-radius: 6px;
+      font-size: 0.875rem;
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+
+    .btn-edit:hover {
+      background: var(--primary-hover);
+    }
   </style>
 
   <script is:inline>
@@ -234,17 +252,25 @@ const userRole = payload.role;
 
         docsList.innerHTML = drafts.map(function(draft) {
           const statusLabel = draft.status === 'pending_review' ? 'Pending Review' : 'Published';
+          const editBtn = draft.status === 'approved' 
+            ? `<a href="/admin/manage/${draft._id}" class="btn-edit">⚙️ Manage</a>`
+            : '';
+          
           return `
             <div class="doc-card">
               <div class="doc-header">
-                <div>
+                <div style="flex: 1;">
                   <h3 class="doc-title">${draft.title}</h3>
                   <div class="doc-meta">
                     <span>Category: ${draft.category}</span>
+                    <span>Tabs: ${draft.tabs?.length || 0}</span>
                     <span>Updated: ${new Date(draft.updatedAt).toLocaleDateString()}</span>
                   </div>
                 </div>
-                <span class="doc-status status-${draft.status}">${statusLabel}</span>
+                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                  <span class="doc-status status-${draft.status}">${statusLabel}</span>
+                  ${editBtn}
+                </div>
               </div>
               ${draft.description ? `<p style="color: var(--text-secondary);">${draft.description}</p>` : ''}
             </div>

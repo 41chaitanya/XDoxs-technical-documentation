@@ -28,3 +28,9 @@ export function extractH2Headings(content: string): Array<{ slug: string; text: 
     .filter(h => h.depth === 2)
     .map(h => ({ slug: h.slug, text: h.text }));
 }
+
+export function extractFirstH1(content: string): string {
+  const allHeadings = extractHeadings(content);
+  const h1 = allHeadings.find(h => h.depth === 1);
+  return h1 ? h1.text : 'Untitled';
+}

@@ -2,6 +2,7 @@ import type { APIRoute } from 'astro';
 import { getDb } from '../../../lib/db/mongodb';
 import { COLLECTIONS } from '../../../lib/db/models';
 import { verifyToken } from '../../../lib/auth/jwt';
+import { extractFirstH1 } from '../../../lib/markdown/headings';
 
 export const POST: APIRoute = async ({ request, cookies }) => {
   try {
@@ -14,7 +15,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     }
 
     const payload = verifyToken(token);
-    if (!payload || (payload.role !== 'admin' && payload.role !== 'super_admin')) {
+    if (!payload || payload.role !== 'admin' && payload.role !== 'super_admin') {
       return new Response(JSON.stringify({ success: false, error: 'Unauthorized' }), {
         status: 403,
         headers: { 'Content-Type': 'application/json' },
@@ -47,6 +48,17 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       });
     }
 
+    // Extract first H1 as tab title
+    const tabTitle = extractFirstH1(content);
+    
+    // Create first tab
+    const tabs = [{
+      id: `tab-1`,
+      title: tabTitle,
+      content: content,
+      order: 1,
+    }];
+
     // Create draft document
     const draft = {
       instructorId: payload.userId,
@@ -56,7 +68,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       slug,
       description: description || '',
       content,
-      tabs: [],
+      tabs, // Tab-based structure
       tags: tags || [],
       status: 'pending_review', // Goes to super admin for review
       createdAt: new Date(),

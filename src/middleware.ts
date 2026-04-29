@@ -1,11 +1,109 @@
 import { defineMiddleware } from 'astro:middleware';
+import { verifyToken } from './lib/auth/jwt';
+
+// Route-to-role mapping
+const PROTECTED_ROUTES = {
+  '/superadmin': ['super_admin'],
+  '/admin': ['admin', 'super_admin'],
+  '/instructor': ['instructor', 'super_admin'],
+  '/student': ['student', 'instructor', 'admin', 'super_admin'],
+  '/api/superadmin': ['super_admin'],
+  '/api/admin': ['admin', 'super_admin'],
+  '/api/instructor': ['instructor', 'super_admin'],
+  '/api/student': ['student', 'instructor', 'admin', 'super_admin'],
+};
+
+// Public routes that don't require authentication
+const PUBLIC_ROUTES = [
+  '/',
+  '/login',
+  '/register',
+  '/docs',
+  '/learn',
+  '/blogs',
+  '/community',
+  '/api/auth/login',
+  '/api/auth/register',
+  '/api/auth/logout',
+  '/api/auth/me',
+  '/api/docs/nav',
+];
+
+function isPublicRoute(pathname: string): boolean {
+  return PUBLIC_ROUTES.some(route => 
+    pathname === route || pathname.startsWith(route + '/')
+  );
+}
+
+function getRequiredRoles(pathname: string): string[] | null {
+  for (const [prefix, roles] of Object.entries(PROTECTED_ROUTES)) {
+    if (pathname.startsWith(prefix)) {
+      return roles;
+    }
+  }
+  return null;
+}
 
 export const onRequest = defineMiddleware(async (context, next) => {
-  const response = await next();
   const url = new URL(context.request.url);
   const pathname = url.pathname;
 
-  // Clone response to add headers
+  // Skip auth for public routes
+  if (isPublicRoute(pathname)) {
+    const response = await next();
+    return addSecurityHeaders(response, pathname);
+  }
+
+  // Check authentication
+  const token = context.cookies.get('auth_token')?.value;
+  
+  if (!token) {
+    // Redirect to login for protected routes
+    if (pathname.startsWith('/api/')) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+    return context.redirect('/login');
+  }
+
+  // Verify token
+  const payload = verifyToken(token);
+  
+  if (!payload) {
+    // Invalid token
+    if (pathname.startsWith('/api/')) {
+      return new Response(JSON.stringify({ error: 'Invalid token' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+    return context.redirect('/login');
+  }
+
+  // Check role authorization
+  const requiredRoles = getRequiredRoles(pathname);
+  
+  if (requiredRoles && !requiredRoles.includes(payload.role)) {
+    // Insufficient permissions
+    if (pathname.startsWith('/api/')) {
+      return new Response(JSON.stringify({ error: 'Forbidden - Insufficient permissions' }), {
+        status: 403,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+    return context.redirect('/unauthorized');
+  }
+
+  // Attach user to context for use in pages
+  context.locals.user = payload;
+
+  const response = await next();
+  return addSecurityHeaders(response, pathname);
+});
+
+function addSecurityHeaders(response: Response, pathname: string): Response {
   const newHeaders = new Headers(response.headers);
 
   // ─── Security Headers (Lighthouse Best Practices) ───
@@ -23,7 +121,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
   else if (response.headers.get('content-type')?.includes('text/html')) {
     newHeaders.set('Cache-Control', 'public, max-age=0, must-revalidate');
   }
-  // API routes: no cache (use private + no-cache instead of no-store to allow bfcache)
+  // API routes: no cache
   else if (pathname.startsWith('/api/')) {
     newHeaders.set('Cache-Control', 'private, no-cache, must-revalidate');
   }
@@ -37,4 +135,4 @@ export const onRequest = defineMiddleware(async (context, next) => {
     statusText: response.statusText,
     headers: newHeaders,
   });
-});
+}

@@ -4,7 +4,7 @@ import Header from '../components/Header.astro';
 import { getDb } from '../lib/db/mongodb';
 import { COLLECTIONS } from '../lib/db/models';
 
-export const prerender = true;
+export const prerender = false;
 
 const db = await getDb();
 const allDocs = await db.collection(COLLECTIONS.DOC_DRAFTS)

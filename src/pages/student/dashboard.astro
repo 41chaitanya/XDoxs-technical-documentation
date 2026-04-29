@@ -11,20 +11,19 @@ if (!token) {
 
 const payload = verifyToken(token);
 
-if (!payload || (payload.role !== 'instructor' && payload.role !== 'super_admin')) {
+if (!payload || (payload.role !== 'student' && payload.role !== 'super_admin')) {
   return Astro.redirect('/login');
 }
 
 const userEmail = payload.email;
-const userRole = payload.role;
 ---
 
-<BaseLayout title="Instructor Dashboard" noindex={true}>
+<BaseLayout title="Student Dashboard" noindex={true}>
   <Header />
   <div class="dashboard-container">
     <div class="dashboard-header">
       <div>
-        <h1>Instructor Dashboard</h1>
+        <h1>Student Dashboard</h1>
         <p class="user-info">Welcome, {userEmail}</p>
       </div>
     </div>
@@ -32,16 +31,16 @@ const userRole = payload.role;
     <div class="info-section">
       <div class="info-card">
         <h2>📚 Documentation Access</h2>
-        <p>As an instructor, you can view all published documentation but cannot create or edit docs.</p>
-        <p>Documentation management is handled by Admins and Super Admins.</p>
+        <p>Browse all published documentation and learn new technologies.</p>
+        <p>Access comprehensive guides, tutorials, and technical documentation.</p>
         <a href="/learn" class="btn-primary">Browse Documentation</a>
       </div>
 
       <div class="info-card">
         <h2>✍️ Blog Writing</h2>
-        <p>Write and publish blog posts to share your knowledge with the community.</p>
-        <p>Your blog posts will be reviewed by admins before being published.</p>
-        <a href="/instructor/write-blog" class="btn-primary">Write New Blog</a>
+        <p>Share your learning journey and experiences with the community.</p>
+        <p>Write blog posts that will be reviewed by admins before publishing.</p>
+        <a href="/student/write-blog" class="btn-primary">Write New Blog</a>
       </div>
     </div>
   </div>
@@ -71,12 +70,6 @@ const userRole = payload.role;
     .user-info {
       color: var(--text-secondary);
       margin: 0.5rem 0 0 0;
-    }
-
-    .header-actions {
-      display: flex;
-      gap: 0.75rem;
-      flex-wrap: wrap;
     }
 
     .info-section {
@@ -114,12 +107,12 @@ const userRole = payload.role;
       align-items: center;
       gap: 0.5rem;
       padding: 0.75rem 1.5rem;
+      background: var(--primary);
       color: white;
       text-decoration: none;
       border-radius: 8px;
       font-weight: 500;
       transition: all 0.2s;
-      background: var(--primary);
     }
 
     .btn-primary:hover {

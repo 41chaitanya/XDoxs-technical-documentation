@@ -21,6 +21,7 @@ export interface DocDraft {
   _id?: ObjectId;
   instructorId: string;
   instructorEmail: string;
+  authorRole?: 'admin' | 'instructor'; // Track who created it
   category: string;
   title: string; // Main document title
   slug: string;
@@ -30,8 +31,8 @@ export interface DocDraft {
   renderedHtmlHi?: string; // Pre-rendered HTML — Hinglish (generated at publish time)
   tabs?: Tab[]; // Multiple tabs (each tab = one uploaded MD file)
   tags: string[];
-  status: 'draft' | 'pending_review' | 'approved' | 'rejected' | 'needs_changes';
-  feedback?: string; // Admin feedback
+  status: 'draft' | 'pending_admin_review' | 'pending_review' | 'approved' | 'rejected' | 'needs_changes';
+  feedback?: string; // Admin/Super admin feedback
   createdAt: Date;
   updatedAt: Date;
   publishedAt?: Date;
@@ -54,6 +55,7 @@ export interface BlogPost {
   authorId: string;
   authorEmail: string;
   authorName: string;
+  authorRole: 'instructor' | 'student'; // Track who wrote it
   title: string;
   slug: string;
   excerpt: string;
@@ -61,13 +63,23 @@ export interface BlogPost {
   coverImage?: string;
   category: string; // tech category like 'javascript', 'react', etc.
   tags: string[];
-  status: 'draft' | 'pending_review' | 'published' | 'rejected';
+  status: 'draft' | 'pending_admin_review' | 'pending_review' | 'published' | 'rejected';
   views: number;
   likes: number;
-  feedback?: string; // Admin feedback
+  feedback?: string; // Admin/Super admin feedback
   createdAt: Date;
   updatedAt: Date;
   publishedAt?: Date;
+}
+
+export interface Notification {
+  _id?: ObjectId;
+  userId: string;
+  message: string;
+  type: 'info' | 'success' | 'warning' | 'error';
+  isRead: boolean;
+  link?: string; // Optional URL to relevant page
+  createdAt: Date;
 }
 
 // Collections
@@ -76,4 +88,5 @@ export const COLLECTIONS = {
   DOC_DRAFTS: 'doc_drafts',
   PUBLISHED_DOCS: 'published_docs',
   BLOG_POSTS: 'blog_posts',
+  NOTIFICATIONS: 'notifications',
 } as const;

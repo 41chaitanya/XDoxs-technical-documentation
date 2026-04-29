@@ -1,0 +1,87 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Header from '../components/Header.astro';
+---
+
+<BaseLayout title="Unauthorized - XDoxs" noindex={true}>
+  <Header />
+  
+  <div class="error-container">
+    <div class="error-content">
+      <h1>🚫 Access Denied</h1>
+      <p>You don't have permission to access this page.</p>
+      <p class="hint">Please contact your administrator if you believe this is an error.</p>
+      <div class="actions">
+        <a href="/" class="btn-primary">Go Home</a>
+        <a href="/login" class="btn-secondary">Login</a>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    .error-container {
+      min-height: calc(100vh - 65px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+      background: var(--bg-primary);
+    }
+
+    .error-content {
+      text-align: center;
+      max-width: 500px;
+    }
+
+    .error-content h1 {
+      font-size: 3rem;
+      margin-bottom: 1rem;
+      color: var(--text-primary);
+    }
+
+    .error-content p {
+      font-size: 1.125rem;
+      color: var(--text-secondary);
+      margin-bottom: 1rem;
+    }
+
+    .hint {
+      font-size: 0.95rem;
+      color: var(--text-secondary);
+      margin-bottom: 2rem;
+    }
+
+    .actions {
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+    }
+
+    .btn-primary, .btn-secondary {
+      padding: 0.75rem 1.5rem;
+      border-radius: 8px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.2s;
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: var(--primary-hover);
+    }
+
+    .btn-secondary {
+      background: var(--bg-secondary);
+      color: var(--text-primary);
+      border: 1px solid var(--border);
+    }
+
+    .btn-secondary:hover {
+      background: var(--bg-tertiary);
+    }
+  </style>
+</BaseLayout>
