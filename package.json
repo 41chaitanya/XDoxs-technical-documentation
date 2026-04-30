@@ -13,6 +13,8 @@
     "astro": "astro",
     "seed": "tsx scripts/seed-users.ts",
     "seed:docs": "tsx scripts/seed-docs.ts",
+    "seed:blog": "tsx scripts/seed-sample-blog.ts",
+    "seed:blogs": "tsx scripts/seed-multiple-blogs.ts",
     "reset:docs": "tsx scripts/reset-docs.ts",
     "clear-docs": "tsx scripts/clear-all-docs.ts",
     "test-setup": "tsx scripts/test-local-setup.ts",

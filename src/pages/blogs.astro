@@ -47,7 +47,7 @@ const categories = [...new Set(publishedBlogs.map((blog: any) => blog.category))
               <h2 class="section-title">🔥 Top Ranking</h2>
               <div class="blogs-grid">
                 {topBlogs.map((blog: any) => (
-                  <article class="blog-card featured">
+                  <a href={`/blogs/${blog.slug}`} class="blog-card featured">
                     <div class="blog-header">
                       <span class="blog-category">{blog.category}</span>
                       <span class="blog-views">👁️ {blog.views}</span>
@@ -58,7 +58,7 @@ const categories = [...new Set(publishedBlogs.map((blog: any) => blog.category))
                       <span class="blog-author">By {blog.authorName}</span>
                       <span class="blog-date">{new Date(blog.publishedAt).toLocaleDateString()}</span>
                     </div>
-                  </article>
+                  </a>
                 ))}
               </div>
             </section>
@@ -69,7 +69,7 @@ const categories = [...new Set(publishedBlogs.map((blog: any) => blog.category))
             <h2 class="section-title">📝 Latest Blogs</h2>
             <div class="blogs-grid">
               {latestBlogs.map((blog: any) => (
-                <article class="blog-card">
+                <a href={`/blogs/${blog.slug}`} class="blog-card">
                   <div class="blog-header">
                     <span class="blog-category">{blog.category}</span>
                   </div>
@@ -79,7 +79,7 @@ const categories = [...new Set(publishedBlogs.map((blog: any) => blog.category))
                     <span class="blog-author">By {blog.authorName}</span>
                     <span class="blog-date">{new Date(blog.publishedAt).toLocaleDateString()}</span>
                   </div>
-                </article>
+                </a>
               ))}
             </div>
           </section>
@@ -92,14 +92,14 @@ const categories = [...new Set(publishedBlogs.map((blog: any) => blog.category))
                 <h2 class="section-title">📚 {category}</h2>
                 <div class="blogs-grid">
                   {categoryBlogs.map((blog: any) => (
-                    <article class="blog-card">
+                    <a href={`/blogs/${blog.slug}`} class="blog-card">
                       <h3>{blog.title}</h3>
                       <p>{blog.excerpt}</p>
                       <div class="blog-footer">
                         <span class="blog-author">By {blog.authorName}</span>
                         <span class="blog-date">{new Date(blog.publishedAt).toLocaleDateString()}</span>
                       </div>
-                    </article>
+                    </a>
                   ))}
                 </div>
               </section>
@@ -171,6 +171,7 @@ const categories = [...new Set(publishedBlogs.map((blog: any) => blog.category))
     transition: all 0.2s ease;
     display: block;
     color: inherit;
+    text-decoration: none;
   }
 
   .blog-card:hover {
