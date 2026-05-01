@@ -61,22 +61,36 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       console.error('S3 sync failed (non-blocking):', s3Err);
     }
 
-    // 🚀 Trigger CodeBuild with smart invalidation
-    const invalidationType = isRepublish ? 'republish' : 'new';
-    const buildId = await triggerBuild(invalidationType, draft.category, draft.slug);
-    
-    return new Response(
-      JSON.stringify({ 
-        success: true,
-        isRepublish,
-        buildId,
-        message: buildId 
-          ? `Document approved and build triggered (${invalidationType})` 
-          : 'Document approved — manual rebuild required'
-      }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    // 🚀 Trigger CodeBuild with smart invalidation (optional - skip if no permissions)
+    try {
+      const invalidationType = isRepublish ? 'republish' : 'new';
+      const buildId = await triggerBuild(invalidationType, draft.category, draft.slug);
+      
+      return new Response(
+        JSON.stringify({ 
+          success: true,
+          isRepublish,
+          buildId,
+          message: buildId 
+            ? `Document approved and build triggered (${invalidationType})` 
+            : 'Document approved — manual rebuild required'
+        }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    } catch (buildErr: any) {
+      console.warn('⚠️  CodeBuild trigger failed (non-blocking):', buildErr.message);
+      
+      return new Response(
+        JSON.stringify({ 
+          success: true,
+          isRepublish,
+          message: 'Document approved (CodeBuild skipped - no permissions)'
+        }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
   } catch (error) {
     console.error('Approve error:', error);
     return new Response(JSON.stringify({ error: 'Internal server error' }), {

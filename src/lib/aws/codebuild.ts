@@ -74,8 +74,11 @@ export async function triggerBuild(
     console.log(`🚀 CodeBuild: Triggered build ${buildId} (type: ${type}, path: ${category}/${slug})`);
     return buildId;
   } catch (error) {
-    console.error('❌ CodeBuild trigger failed:', error);
-    // Don't fail the caller — build trigger is non-blocking
+    // Silently fail — build trigger is optional and non-blocking
+    // Only log in development mode
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn('⚠️  CodeBuild trigger skipped (no permissions)');
+    }
     return null;
   }
 }

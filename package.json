@@ -18,7 +18,9 @@
     "reset:docs": "tsx scripts/reset-docs.ts",
     "clear-docs": "tsx scripts/clfear-all-docs.ts",
     "test-setup": "tsx scripts/test-local-setup.ts",
-    "test-mongo": "tsx scripts/test-mongodb-only.ts"
+    "test-mongo": "tsx scripts/test-mongodb-only.ts",
+    "test-s3": "tsx scripts/test-s3-connection.ts",
+    "import-s3": "tsx scripts/import-from-s3.ts"
   },
   "dependencies": {
     "@astrojs/check": "^0.9.8",
