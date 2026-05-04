@@ -1,0 +1,516 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Header from '../../components/Header.astro';
+import { verifyToken } from '../../lib/auth/jwt';
+import { getAllCategories } from '../../lib/db/navigation';
+
+export const prerender = false;
+
+const token = Astro.cookies.get('auth_token')?.value;
+
+if (!token) {
+  return Astro.redirect('/login');
+}
+
+const payload = verifyToken(token);
+
+if (!payload || !['admin', 'super_admin'].includes(payload.role)) {
+  return Astro.redirect('/unauthorized');
+}
+
+const categories = await getAllCategories();
+---
+
+<BaseLayout title="Manage Navigation" noindex={true}>
+  <Header />
+  
+  <div class="manage-nav-container">
+    <div class="header-section">
+      <h1>📁 Manage Navigation Structure</h1>
+      <p>Organize documentation with up to 3 levels of nesting</p>
+    </div>
+
+    <div class="category-selector">
+      <label for="category-select">Category:</label>
+      <select id="category-select">
+        <option value="">Select a category</option>
+        {categories.map(cat => (
+          <option value={cat}>{cat}</option>
+        ))}
+      </select>
+      <button id="create-folder-btn" class="btn btn-primary">+ Create Folder</button>
+      <button id="add-doc-btn" class="btn btn-secondary">+ Add Document</button>
+    </div>
+
+    <div id="nav-tree-container" class="nav-tree-container">
+      <div class="empty-state">Select a category to manage navigation</div>
+    </div>
+  </div>
+
+  <!-- Create Folder Modal -->
+  <dialog id="folder-modal" class="modal">
+    <div class="modal-content">
+      <h2>Create Folder</h2>
+      <form id="folder-form">
+        <div class="form-group">
+          <label>Folder Name</label>
+          <input type="text" id="folder-name" required />
+        </div>
+        <div class="form-group">
+          <label>Parent Folder (optional)</label>
+          <select id="folder-parent">
+            <option value="">Root Level</option>
+          </select>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" onclick="document.getElementById('folder-modal').close()">Cancel</button>
+          <button type="submit" class="btn btn-primary">Create</button>
+        </div>
+      </form>
+    </div>
+  </dialog>
+
+  <!-- Add Document Modal -->
+  <dialog id="doc-modal" class="modal">
+    <div class="modal-content">
+      <h2>Add Document to Navigation</h2>
+      <form id="doc-form">
+        <div class="form-group">
+          <label>Document</label>
+          <select id="doc-select" required>
+            <option value="">Select a document</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Parent Folder (optional)</label>
+          <select id="doc-parent">
+            <option value="">Root Level</option>
+          </select>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" onclick="document.getElementById('doc-modal').close()">Cancel</button>
+          <button type="submit" class="btn btn-primary">Add</button>
+        </div>
+      </form>
+    </div>
+  </dialog>
+
+  <style>
+    .manage-nav-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+
+    .header-section {
+      margin-bottom: 2rem;
+    }
+
+    .header-section h1 {
+      margin: 0 0 0.5rem 0;
+      color: var(--text-primary);
+    }
+
+    .header-section p {
+      margin: 0;
+      color: var(--text-secondary);
+    }
+
+    .category-selector {
+      display: flex;
+      gap: 1rem;
+      align-items: center;
+      margin-bottom: 2rem;
+      padding: 1.5rem;
+      background: var(--bg-secondary);
+      border-radius: 12px;
+      border: 1px solid var(--border);
+    }
+
+    .category-selector label {
+      font-weight: 500;
+      color: var(--text-primary);
+    }
+
+    .category-selector select {
+      flex: 1;
+      padding: 0.5rem;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+    }
+
+    .btn {
+      padding: 0.5rem 1rem;
+      border-radius: 6px;
+      border: none;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: var(--primary-hover);
+    }
+
+    .btn-secondary {
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      border: 1px solid var(--border);
+    }
+
+    .btn-secondary:hover {
+      background: var(--bg-tertiary);
+    }
+
+    .nav-tree-container {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem;
+      min-height: 400px;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 3rem;
+      color: var(--text-secondary);
+    }
+
+    .modal {
+      border: none;
+      border-radius: 12px;
+      padding: 0;
+      max-width: 500px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    }
+
+    .modal::backdrop {
+      background: rgba(0, 0, 0, 0.5);
+    }
+
+    .modal-content {
+      padding: 2rem;
+    }
+
+    .modal-content h2 {
+      margin: 0 0 1.5rem 0;
+      color: var(--text-primary);
+    }
+
+    .form-group {
+      margin-bottom: 1.5rem;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 0.5rem;
+      font-weight: 500;
+      color: var(--text-primary);
+    }
+
+    .form-group input,
+    .form-group select {
+      width: 100%;
+      padding: 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 1rem;
+      justify-content: flex-end;
+      margin-top: 2rem;
+    }
+
+    :global(.nav-item-actions) {
+      display: inline-flex;
+      gap: 0.5rem;
+      margin-left: 0.5rem;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+
+    :global(.nav-folder-header:hover .nav-item-actions),
+    :global(.nav-doc-link:hover .nav-item-actions) {
+      opacity: 1;
+    }
+
+    :global(.nav-item-btn) {
+      padding: 0.25rem 0.5rem;
+      font-size: 0.75rem;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      background: var(--bg-primary);
+      color: var(--text-secondary);
+      transition: all 0.2s;
+    }
+
+    :global(.nav-item-btn:hover) {
+      background: var(--primary);
+      color: white;
+    }
+
+    :global(.nav-item-btn.delete:hover) {
+      background: oklch(0.577 0.245 27.325);
+    }
+
+    :global(.nav-item.dragging) {
+      opacity: 0.5;
+    }
+
+    :global(.nav-item.drag-over) {
+      border-top: 2px solid var(--primary);
+    }
+  </style>
+
+  <script>
+    let currentCategory = '';
+    let navTree = [];
+
+    document.getElementById('category-select')?.addEventListener('change', async (e) => {
+      currentCategory = (e.target as HTMLSelectElement).value;
+      if (currentCategory) {
+        await loadNavTree();
+      }
+    });
+
+    document.getElementById('create-folder-btn')?.addEventListener('click', () => {
+      if (!currentCategory) {
+        alert('Please select a category first');
+        return;
+      }
+      document.getElementById('folder-modal')?.showModal();
+      populateFolderSelect();
+    });
+
+    document.getElementById('add-doc-btn')?.addEventListener('click', async () => {
+      if (!currentCategory) {
+        alert('Please select a category first');
+        return;
+      }
+      await loadAvailableDocs();
+      document.getElementById('doc-modal')?.showModal();
+      populateFolderSelect();
+    });
+
+    async function loadNavTree() {
+      const container = document.getElementById('nav-tree-container');
+      if (!container) return;
+
+      try {
+        const response = await fetch(`/api/nav/get-tree?category=${currentCategory}`);
+        const data = await response.json();
+
+        if (!data.success) {
+          container.innerHTML = '<div class="empty-state">No navigation structure found. Create folders and add documents to get started.</div>';
+          return;
+        }
+
+        navTree = data.tree;
+        container.innerHTML = renderEditableTree(navTree);
+        attachDragAndDrop();
+      } catch (error) {
+        console.error('Error loading nav tree:', error);
+        container.innerHTML = '<div class="empty-state">Error loading navigation</div>';
+      }
+    }
+
+    function renderEditableTree(items, level = 0) {
+      if (!items || items.length === 0) return '';
+
+      return items.map(item => {
+        if (item.type === 'folder') {
+          return `
+            <div class="nav-item nav-folder nav-level-${level}" data-id="${item._id}" data-type="folder" draggable="true">
+              <div class="nav-folder-header">
+                <span class="nav-folder-icon">▶</span>
+                <span class="nav-folder-name">${item.name}</span>
+                <span class="nav-item-actions">
+                  <button class="nav-item-btn" onclick="renameItem('${item._id}', '${item.name}')">✏️</button>
+                  <button class="nav-item-btn delete" onclick="deleteItem('${item._id}')">🗑️</button>
+                </span>
+              </div>
+              <div class="nav-folder-children">
+                ${renderEditableTree(item.children, level + 1)}
+              </div>
+            </div>
+          `;
+        } else {
+          return `
+            <div class="nav-item nav-level-${level}" data-id="${item._id}" data-type="doc" draggable="true">
+              <div class="nav-doc-link">
+                ${item.name}
+                <span class="nav-item-actions">
+                  <button class="nav-item-btn delete" onclick="deleteItem('${item._id}')">🗑️</button>
+                </span>
+              </div>
+            </div>
+          `;
+        }
+      }).join('');
+    }
+
+    function populateFolderSelect() {
+      const folderParent = document.getElementById('folder-parent') as HTMLSelectElement;
+      const docParent = document.getElementById('doc-parent') as HTMLSelectElement;
+      
+      const options = '<option value="">Root Level</option>' + getFolderOptions(navTree, 0);
+      
+      if (folderParent) folderParent.innerHTML = options;
+      if (docParent) docParent.innerHTML = options;
+    }
+
+    function getFolderOptions(items, level) {
+      if (!items || level >= 3) return '';
+      
+      return items.filter(item => item.type === 'folder').map(item => {
+        const indent = '&nbsp;&nbsp;'.repeat(level);
+        let html = `<option value="${item._id}">${indent}${item.name}</option>`;
+        if (item.children) {
+          html += getFolderOptions(item.children, level + 1);
+        }
+        return html;
+      }).join('');
+    }
+
+    async function loadAvailableDocs() {
+      // Load S3 docs that aren't in navigation yet
+      const docSelect = document.getElementById('doc-select') as HTMLSelectElement;
+      // TODO: Implement loading available S3 docs
+      docSelect.innerHTML = '<option value="">No documents available</option>';
+    }
+
+    function attachDragAndDrop() {
+      const items = document.querySelectorAll('.nav-item[draggable="true"]');
+      
+      items.forEach(item => {
+        item.addEventListener('dragstart', handleDragStart);
+        item.addEventListener('dragover', handleDragOver);
+        item.addEventListener('drop', handleDrop);
+        item.addEventListener('dragend', handleDragEnd);
+      });
+    }
+
+    let draggedItem = null;
+
+    function handleDragStart(e) {
+      draggedItem = e.target.closest('.nav-item');
+      draggedItem.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+    }
+
+    function handleDragOver(e) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      
+      const target = e.target.closest('.nav-item');
+      if (target && target !== draggedItem) {
+        target.classList.add('drag-over');
+      }
+    }
+
+    function handleDrop(e) {
+      e.preventDefault();
+      
+      const target = e.target.closest('.nav-item');
+      if (target && target !== draggedItem) {
+        // TODO: Implement move logic
+        console.log('Move', draggedItem.dataset.id, 'to', target.dataset.id);
+      }
+      
+      document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+    }
+
+    function handleDragEnd(e) {
+      draggedItem?.classList.remove('dragging');
+      document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+    }
+
+    window.renameItem = async function(itemId, currentName) {
+      const newName = prompt('Enter new name:', currentName);
+      if (!newName || newName === currentName) return;
+
+      try {
+        const response = await fetch('/api/nav/update-item', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ itemId, updates: { name: newName } })
+        });
+
+        const data = await response.json();
+        if (data.success) {
+          await loadNavTree();
+        } else {
+          alert('Error: ' + data.error);
+        }
+      } catch (error) {
+        alert('Failed to rename item');
+      }
+    };
+
+    window.deleteItem = async function(itemId) {
+      if (!confirm('Are you sure you want to delete this item?')) return;
+
+      try {
+        const response = await fetch('/api/nav/delete-item', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ itemId })
+        });
+
+        const data = await response.json();
+        if (data.success) {
+          await loadNavTree();
+        } else {
+          alert('Error: ' + data.error);
+        }
+      } catch (error) {
+        alert('Failed to delete item');
+      }
+    };
+
+    // Form submissions
+    document.getElementById('folder-form')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const name = (document.getElementById('folder-name') as HTMLInputElement).value;
+      const parentId = (document.getElementById('folder-parent') as HTMLSelectElement).value;
+      
+      try {
+        const response = await fetch('/api/nav/create-item', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            category: currentCategory,
+            type: 'folder',
+            name,
+            parentId: parentId || null,
+            order: 0,
+            level: parentId ? 1 : 0 // Will be calculated properly on server
+          })
+        });
+
+        const data = await response.json();
+        if (data.success) {
+          document.getElementById('folder-modal')?.close();
+          await loadNavTree();
+        } else {
+          alert('Error: ' + data.error);
+        }
+      } catch (error) {
+        alert('Failed to create folder');
+      }
+    });
+  </script>
+</BaseLayout>

@@ -124,15 +124,20 @@ const nextUrl = hasNext ? `?tab=${validTabIndex + 1}` : null;
   })} />
   
   <div class="docs-container">
-    <!-- Left Sidebar: Tabs Navigation -->
-    <aside class="tabs-sidebar" aria-label="Documentation tabs">
+    <!-- Left Sidebar: Navigation Tree -->
+    <aside class="tabs-sidebar" aria-label="Documentation navigation">
       <div class="sidebar-header">
         <div class="doc-category">{category}</div>
         <h2 class="doc-title">{title}</h2>
       </div>
       
       <nav class="tabs-nav" aria-label="Document sections">
-        <ul class="tabs-list" role="list">
+        <div id="nav-tree-wrapper">
+          <!-- Navigation tree will be loaded here -->
+        </div>
+        
+        <!-- Fallback: Tab navigation if no tree structure -->
+        <ul class="tabs-list" role="list" id="tabs-fallback">
           {tabs.map((tab: any, index: number) => (
             <li>
               <a 
@@ -276,10 +281,93 @@ const nextUrl = hasNext ? `?tab=${validTabIndex + 1}` : null;
     list-style: none;
     margin: 0;
     padding: 0;
+    display: none;
   }
 
   .tabs-list li {
     margin-bottom: 0.25rem;
+  }
+
+  #nav-tree-wrapper :global(.nav-folder) {
+    margin-bottom: 0.5rem;
+  }
+
+  #nav-tree-wrapper :global(.nav-folder-header) {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem;
+    cursor: pointer;
+    border-radius: 8px;
+    transition: all 0.15s ease;
+    border-left: 3px solid transparent;
+  }
+
+  #nav-tree-wrapper :global(.nav-folder-header:hover) {
+    background: var(--bg-primary);
+  }
+
+  #nav-tree-wrapper :global(.nav-folder-icon) {
+    font-size: 0.75rem;
+    transition: transform 0.2s;
+    color: var(--text-secondary);
+  }
+
+  #nav-tree-wrapper :global(.nav-folder.expanded .nav-folder-icon) {
+    transform: rotate(90deg);
+  }
+
+  #nav-tree-wrapper :global(.nav-folder-name) {
+    flex: 1;
+    font-weight: 500;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+  }
+
+  #nav-tree-wrapper :global(.nav-folder-children) {
+    display: none;
+    padding-left: 1rem;
+    margin-top: 0.25rem;
+  }
+
+  #nav-tree-wrapper :global(.nav-folder.expanded .nav-folder-children) {
+    display: block;
+  }
+
+  #nav-tree-wrapper :global(.nav-doc-link) {
+    display: block;
+    padding: 0.75rem;
+    color: var(--text-secondary);
+    text-decoration: none;
+    border-radius: 8px;
+    transition: all 0.15s ease;
+    font-size: 0.9rem;
+    border-left: 3px solid transparent;
+    margin-bottom: 0.25rem;
+  }
+
+  #nav-tree-wrapper :global(.nav-doc-link:hover) {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+  }
+
+  #nav-tree-wrapper :global(.nav-doc-link.active) {
+    background: var(--bg-primary);
+    border-left-color: var(--primary);
+    color: var(--primary);
+    font-weight: 500;
+  }
+
+  #nav-tree-wrapper :global(.nav-level-1) {
+    padding-left: 1rem;
+  }
+
+  #nav-tree-wrapper :global(.nav-level-2) {
+    padding-left: 2rem;
+  }
+
+  #nav-tree-wrapper :global(.nav-level-3) {
+    padding-left: 3rem;
   }
 
   .tab-link {
@@ -752,6 +840,87 @@ const nextUrl = hasNext ? `?tab=${validTabIndex + 1}` : null;
 
 <script is:inline>
   (function() {
+    // Try to load navigation tree
+    async function loadNavTree() {
+      const navWrapper = document.getElementById('nav-tree-wrapper');
+      const tabsFallback = document.getElementById('tabs-fallback');
+      
+      if (!navWrapper) return;
+      
+      // Extract category from URL
+      const pathParts = window.location.pathname.split('/');
+      const category = pathParts[2]; // /docs/category/slug
+      
+      if (!category) {
+        // Show tabs fallback
+        if (tabsFallback) tabsFallback.style.display = 'block';
+        return;
+      }
+      
+      try {
+        const response = await fetch(`/api/nav/get-tree?category=${category}`);
+        const data = await response.json();
+        
+        if (data.success && data.tree && data.tree.length > 0) {
+          // Hide tabs fallback
+          if (tabsFallback) tabsFallback.style.display = 'none';
+          
+          // Render navigation tree
+          navWrapper.innerHTML = renderNavTree(data.tree);
+          attachNavListeners();
+        } else {
+          // Show tabs fallback
+          if (tabsFallback) tabsFallback.style.display = 'block';
+        }
+      } catch (error) {
+        console.error('Error loading nav tree:', error);
+        // Show tabs fallback on error
+        if (tabsFallback) tabsFallback.style.display = 'block';
+      }
+    }
+    
+    function renderNavTree(items, level = 0) {
+      if (!items || items.length === 0) return '';
+      
+      return items.map(function(item) {
+        if (item.type === 'folder') {
+          return `
+            <div class="nav-folder nav-level-${level}">
+              <div class="nav-folder-header">
+                <span class="nav-folder-icon">▶</span>
+                <span class="nav-folder-name">${item.name}</span>
+              </div>
+              <div class="nav-folder-children">
+                ${renderNavTree(item.children, level + 1)}
+              </div>
+            </div>
+          `;
+        } else {
+          const url = `/docs/${item.category}/${item.slug}`;
+          const isActive = window.location.pathname === url;
+          return `
+            <a href="${url}" class="nav-doc-link ${isActive ? 'active' : ''}">
+              ${item.name}
+            </a>
+          `;
+        }
+      }).join('');
+    }
+    
+    function attachNavListeners() {
+      document.querySelectorAll('.nav-folder-header').forEach(function(header) {
+        header.addEventListener('click', function() {
+          const folder = header.closest('.nav-folder');
+          if (folder) {
+            folder.classList.toggle('expanded');
+          }
+        });
+      });
+    }
+    
+    // Load navigation tree on page load
+    loadNavTree();
+
     // Copy code to clipboard
     window.copyCode = function(codeId) {
       const codeElement = document.getElementById(codeId);

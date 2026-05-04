@@ -1,0 +1,187 @@
+---
+/**
+ * Navigation Tree Component
+ * Displays 3-level nested navigation with dropdowns
+ */
+interface Props {
+  category: string;
+  currentSlug?: string;
+}
+
+const { category, currentSlug } = Astro.props;
+---
+
+<div class="nav-tree" data-category={category}>
+  <div class="nav-loading">Loading navigation...</div>
+</div>
+
+<style>
+  .nav-tree {
+    width: 100%;
+  }
+
+  .nav-loading {
+    padding: 1rem;
+    text-align: center;
+    color: var(--text-secondary);
+  }
+
+  :global(.nav-item) {
+    margin: 0;
+    list-style: none;
+  }
+
+  :global(.nav-folder) {
+    margin-bottom: 0.5rem;
+  }
+
+  :global(.nav-folder-header) {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: background 0.2s;
+    user-select: none;
+  }
+
+  :global(.nav-folder-header:hover) {
+    background: var(--bg-tertiary);
+  }
+
+  :global(.nav-folder-icon) {
+    font-size: 0.75rem;
+    transition: transform 0.2s;
+    color: var(--text-secondary);
+  }
+
+  :global(.nav-folder.expanded .nav-folder-icon) {
+    transform: rotate(90deg);
+  }
+
+  :global(.nav-folder-name) {
+    flex: 1;
+    font-weight: 500;
+    color: var(--text-primary);
+  }
+
+  :global(.nav-folder-children) {
+    display: none;
+    padding-left: 1rem;
+    margin-top: 0.25rem;
+  }
+
+  :global(.nav-folder.expanded .nav-folder-children) {
+    display: block;
+  }
+
+  :global(.nav-doc-link) {
+    display: block;
+    padding: 0.5rem 0.75rem;
+    color: var(--text-secondary);
+    text-decoration: none;
+    border-radius: 6px;
+    transition: all 0.2s;
+    font-size: 0.9rem;
+  }
+
+  :global(.nav-doc-link:hover) {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+  }
+
+  :global(.nav-doc-link.active) {
+    background: var(--primary-light);
+    color: var(--primary);
+    font-weight: 500;
+  }
+
+  :global(.nav-level-0) {
+    padding-left: 0;
+  }
+
+  :global(.nav-level-1) {
+    padding-left: 1rem;
+  }
+
+  :global(.nav-level-2) {
+    padding-left: 2rem;
+  }
+
+  :global(.nav-level-3) {
+    padding-left: 3rem;
+  }
+</style>
+
+<script>
+  async function loadNavTree() {
+    const navTree = document.querySelector('.nav-tree');
+    if (!navTree) return;
+
+    const category = navTree.getAttribute('data-category');
+    if (!category) return;
+
+    try {
+      const response = await fetch(`/api/nav/get-tree?category=${category}`);
+      const data = await response.json();
+
+      if (!data.success) {
+        navTree.innerHTML = '<div class="nav-loading">No navigation found</div>';
+        return;
+      }
+
+      navTree.innerHTML = renderTree(data.tree);
+      attachEventListeners();
+    } catch (error) {
+      console.error('Error loading nav tree:', error);
+      navTree.innerHTML = '<div class="nav-loading">Error loading navigation</div>';
+    }
+  }
+
+  function renderTree(items, level = 0) {
+    if (!items || items.length === 0) return '';
+
+    return items.map(item => {
+      if (item.type === 'folder') {
+        return `
+          <div class="nav-item nav-folder nav-level-${level}" data-id="${item._id}">
+            <div class="nav-folder-header">
+              <span class="nav-folder-icon">▶</span>
+              <span class="nav-folder-name">${item.name}</span>
+            </div>
+            <div class="nav-folder-children">
+              ${renderTree(item.children, level + 1)}
+            </div>
+          </div>
+        `;
+      } else {
+        const url = `/docs/${item.category}/${item.slug}`;
+        const isActive = window.location.pathname === url;
+        return `
+          <div class="nav-item nav-level-${level}">
+            <a href="${url}" class="nav-doc-link ${isActive ? 'active' : ''}" data-id="${item._id}">
+              ${item.name}
+            </a>
+          </div>
+        `;
+      }
+    }).join('');
+  }
+
+  function attachEventListeners() {
+    document.querySelectorAll('.nav-folder-header').forEach(header => {
+      header.addEventListener('click', () => {
+        const folder = header.closest('.nav-folder');
+        folder?.classList.toggle('expanded');
+      });
+    });
+  }
+
+  // Load on page load
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', loadNavTree);
+  } else {
+    loadNavTree();
+  }
+</script>

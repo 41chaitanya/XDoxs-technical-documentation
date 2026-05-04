@@ -3,6 +3,8 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 import Header from '../../components/Header.astro';
 import { verifyToken } from '../../lib/auth/jwt';
 import { listMarkdownFiles, isS3Enabled } from '../../lib/aws/s3';
+import { getDb } from '../../lib/db/mongodb';
+import { COLLECTIONS } from '../../lib/db/models';
 
 export const prerender = false;
 
@@ -19,6 +21,13 @@ if (!payload || payload.role !== 'super_admin') {
 }
 
 const userEmail = payload.email;
+
+// Fetch pending review docs from MongoDB
+const db = await getDb();
+const pendingDocs = await db.collection(COLLECTIONS.DOC_DRAFTS)
+  .find({ status: 'pending_review' })
+  .sort({ updatedAt: -1 })
+  .toArray();
 
 // Fetch all docs from S3
 let allDocs: any[] = [];
@@ -80,6 +89,10 @@ if (isS3Enabled()) {
     </div>
 
     <div class="stats-grid">
+      <div class="stat-card highlight-pending">
+        <div class="stat-value">{pendingDocs.length}</div>
+        <div class="stat-label">⏳ Pending Review</div>
+      </div>
       <div class="stat-card">
         <div class="stat-value">{categories.length}</div>
         <div class="stat-label">Categories</div>
@@ -92,11 +105,44 @@ if (isS3Enabled()) {
         <div class="stat-value">{isS3Enabled() ? 'Enabled' : 'Disabled'}</div>
         <div class="stat-label">S3 Storage</div>
       </div>
-      <div class="stat-card">
-        <div class="stat-value">{allDocs.length > 0 ? new Date(allDocs[0].lastModified).toLocaleDateString() : 'N/A'}</div>
-        <div class="stat-label">Last Updated</div>
-      </div>
     </div>
+
+    <!-- Pending Review Section -->
+    {pendingDocs.length > 0 && (
+      <div class="pending-section">
+        <div class="section-header">
+          <h2>⏳ Pending Review ({pendingDocs.length})</h2>
+          <p>Documents waiting for your review</p>
+        </div>
+        
+        <div class="pending-docs-grid">
+          {pendingDocs.map((doc: any) => (
+            <div class="pending-doc-card">
+              <div class="pending-doc-header">
+                <h3>{doc.title}</h3>
+                <span class="pending-badge">Pending</span>
+              </div>
+              <div class="pending-doc-meta">
+                <span>📁 {doc.category}</span>
+                <span>👤 {doc.instructorEmail}</span>
+                <span>📅 {new Date(doc.updatedAt).toLocaleDateString()}</span>
+              </div>
+              {doc.description && (
+                <p class="pending-doc-description">{doc.description}</p>
+              )}
+              <div class="pending-doc-actions">
+                <a href={`/admin/review/${doc._id}`} class="btn btn-primary">
+                  📝 Review Now
+                </a>
+                <a href={`/docs/${doc.category}/${doc.slug}`} class="btn btn-secondary" target="_blank">
+                  👁️ Preview
+                </a>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    )}
 
     <!-- Notifications Section -->
     <div class="notifications-section" id="notifications-section" style="display: none;">
@@ -202,6 +248,16 @@ if (isS3Enabled()) {
       border-radius: 12px;
       border: 1px solid var(--border);
       text-align: center;
+    }
+
+    .stat-card.highlight-pending {
+      background: linear-gradient(135deg, oklch(0.95 0.1 60) 0%, oklch(0.92 0.08 60) 100%);
+      border: 2px solid oklch(0.7 0.15 60);
+    }
+
+    .stat-card.highlight-pending .stat-value {
+      color: oklch(0.5 0.2 60);
+      font-size: 3rem;
     }
 
     .stat-value {
@@ -477,6 +533,106 @@ if (isS3Enabled()) {
       background: oklch(0.98 0.05 120);
     }
 
+    /* Pending Review Section */
+    .pending-section {
+      margin-bottom: 3rem;
+      background: linear-gradient(135deg, oklch(0.98 0.05 60) 0%, oklch(0.96 0.03 60) 100%);
+      border: 2px solid oklch(0.8 0.1 60);
+      border-radius: 16px;
+      padding: 2rem;
+    }
+
+    .section-header {
+      margin-bottom: 1.5rem;
+    }
+
+    .section-header h2 {
+      margin: 0 0 0.5rem 0;
+      color: oklch(0.4 0.2 60);
+      font-size: 1.5rem;
+    }
+
+    .section-header p {
+      margin: 0;
+      color: oklch(0.5 0.1 60);
+      font-size: 0.9rem;
+    }
+
+    .pending-docs-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+      gap: 1.5rem;
+    }
+
+    .pending-doc-card {
+      background: white;
+      border: 1px solid oklch(0.85 0.08 60);
+      border-radius: 12px;
+      padding: 1.5rem;
+      transition: all 0.2s;
+      box-shadow: 0 2px 8px oklch(0 0 0 / 0.05);
+    }
+
+    .pending-doc-card:hover {
+      border-color: oklch(0.7 0.15 60);
+      box-shadow: 0 4px 16px oklch(0 0 0 / 0.1);
+      transform: translateY(-2px);
+    }
+
+    .pending-doc-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: start;
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    .pending-doc-header h3 {
+      margin: 0;
+      font-size: 1.125rem;
+      color: var(--text-primary);
+      flex: 1;
+    }
+
+    .pending-badge {
+      display: inline-block;
+      padding: 0.25rem 0.75rem;
+      background: oklch(0.9 0.15 60);
+      color: oklch(0.4 0.2 60);
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .pending-doc-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+    }
+
+    .pending-doc-description {
+      color: var(--text-secondary);
+      margin-bottom: 1rem;
+      line-height: 1.6;
+      font-size: 0.9rem;
+    }
+
+    .pending-doc-actions {
+      display: flex;
+      gap: 0.75rem;
+    }
+
+    .pending-doc-actions .btn {
+      flex: 1;
+      text-align: center;
+      justify-content: center;
+    }
+
     @media (max-width: 768px) {
       .doc-header {
         flex-direction: column;
@@ -490,20 +646,22 @@ if (isS3Enabled()) {
         flex: 1;
         justify-content: center;
       }
+
+      .pending-docs-grid {
+        grid-template-columns: 1fr;
+      }
     }
   </style>
 
-  <script is:inline>
+  <script is:inline define:vars={{ allDocs }}>
     // Store docs data in page for JavaScript access
-    const allDocsData = [
-      {allDocs.map(doc => `{
-        key: "${doc.key}",
-        category: "${doc.category}",
-        slug: "${doc.slug}",
-        title: "${doc.title}",
-        lastModified: "${doc.lastModified}"
-      }`).join(',\n      ')}
-    ];
+    const allDocsData = allDocs.map(doc => ({
+      key: doc.key,
+      category: doc.category,
+      slug: doc.slug,
+      title: doc.title,
+      lastModified: doc.lastModified
+    }));
 
     // Check for new/updated docs
     function checkForChanges() {
