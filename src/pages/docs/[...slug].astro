@@ -1,33 +1,12 @@
 ---
-import { getDb } from '../../lib/db/mongodb';
-import { COLLECTIONS } from '../../lib/db/models';
+import { getDocContent, isS3Enabled } from '../../lib/aws/s3';
 import { renderMarkdown } from '../../lib/markdown/render';
 import { extractH2Headings } from '../../lib/markdown/headings';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import Header from '../../components/Header.astro';
 
-// ✅ STATIC GENERATION: Temporarily disabled for development - enable for production
+// ✅ SSR Mode: Fetch from S3 at runtime
 export const prerender = false;
-
-// Build time: Fetch all approved docs and generate static paths
-export async function getStaticPaths() {
-  const db = await getDb();
-  const approvedDocs = await db.collection(COLLECTIONS.DOC_DRAFTS)
-    .find({ status: 'approved' })
-    .toArray();
-
-  // Return empty array if no docs (prevents build errors)
-  if (approvedDocs.length === 0) {
-    return [];
-  }
-
-  return approvedDocs.map((draft) => ({
-    params: { 
-      slug: `${draft.category}/${draft.slug}` 
-    },
-    props: { draft }
-  }));
-}
 
 const { slug } = Astro.params;
 const slugPath = Array.isArray(slug) ? slug.join('/') : (slug ?? '');
@@ -40,20 +19,19 @@ const currentTabIndex = parseInt(tabParam);
 
 if (!category || !docSlug) return Astro.redirect('/');
 
-// Fetch the doc from database (for dynamic mode)
-const db = await getDb();
-const draft = await db.collection(COLLECTIONS.DOC_DRAFTS)
-  .findOne({ 
-    category: category,
-    slug: docSlug,
-    status: 'approved'
-  });
+// Check if S3 is enabled
+if (!isS3Enabled()) {
+  return Astro.redirect('/?error=s3-not-configured');
+}
 
-if (!draft) return Astro.redirect('/');
+// Fetch doc from S3
+const docData = await getDocContent(category, docSlug);
 
-// Get tabs
-const tabs = draft.tabs || [];
-if (tabs.length === 0) return Astro.redirect('/');
+if (!docData.markdown || docData.tabs.length === 0) {
+  return Astro.redirect('/');
+}
+
+const { tabs, title, description } = docData;
 
 // Validate tab index
 const validTabIndex = Math.max(0, Math.min(currentTabIndex, tabs.length - 1));
@@ -65,7 +43,7 @@ const htmlContent = await renderMarkdown(currentTab.content);
 // Extract H2 headings for TOC
 const h2Headings = extractH2Headings(currentTab.content);
 
-const publishedAt = draft.publishedAt ? new Date(draft.publishedAt) : new Date(draft.updatedAt);
+const publishedAt = new Date();
 
 // Pagination
 const hasPrevious = validTabIndex > 0;
@@ -75,12 +53,13 @@ const nextUrl = hasNext ? `?tab=${validTabIndex + 1}` : null;
 ---
 
 <BaseLayout 
-  title={`${currentTab.title} - ${draft.title}`}
-  description={draft.description || `Learn about ${currentTab.title} in this comprehensive guide.`}
+  title={`${currentTab.title} - ${title}`}
+  description={description || `Learn about ${currentTab.title} in this comprehensive guide.`}
   article={true}
   publishedTime={publishedAt.toISOString()}
   minimal={true}
 >
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" />
   <Header />
   
   <!-- Structured Data for Article -->
@@ -88,13 +67,13 @@ const nextUrl = hasNext ? `?tab=${validTabIndex + 1}` : null;
     '@context': 'https://schema.org',
     '@type': 'TechArticle',
     headline: currentTab.title,
-    description: draft.description || `Learn about ${currentTab.title}`,
+    description: description || `Learn about ${currentTab.title}`,
     author: {
       '@type': 'Person',
-      name: draft.instructorEmail.split('@')[0]
+      name: 'XDoxs Team'
     },
     datePublished: publishedAt.toISOString(),
-    dateModified: new Date(draft.updatedAt).toISOString(),
+    dateModified: publishedAt.toISOString(),
     publisher: {
       '@type': 'Organization',
       name: 'XDoxs',
@@ -107,7 +86,7 @@ const nextUrl = hasNext ? `?tab=${validTabIndex + 1}` : null;
       '@type': 'WebPage',
       '@id': Astro.url.href
     },
-    keywords: draft.tags?.join(', ') || category,
+    keywords: category,
     articleSection: category,
     inLanguage: 'en-US'
   })} />
@@ -138,7 +117,7 @@ const nextUrl = hasNext ? `?tab=${validTabIndex + 1}` : null;
       {
         '@type': 'ListItem',
         position: 4,
-        name: draft.title,
+        name: title,
         item: Astro.url.href
       }
     ]
@@ -149,7 +128,7 @@ const nextUrl = hasNext ? `?tab=${validTabIndex + 1}` : null;
     <aside class="tabs-sidebar" aria-label="Documentation tabs">
       <div class="sidebar-header">
         <div class="doc-category">{category}</div>
-        <h2 class="doc-title">{draft.title}</h2>
+        <h2 class="doc-title">{title}</h2>
       </div>
       
       <nav class="tabs-nav" aria-label="Document sections">
@@ -175,20 +154,16 @@ const nextUrl = hasNext ? `?tab=${validTabIndex + 1}` : null;
       <article class="docs-article">
         <header class="docs-header">
           <div class="docs-meta">
-            <span>{draft.instructorEmail}</span>
+            <span>XDoxs Team</span>
             <span aria-hidden="true">•</span>
             <time datetime={publishedAt.toISOString()}>
               {publishedAt.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
             </time>
           </div>
           
-          {draft.tags && draft.tags.length > 0 && (
-            <div class="tags" role="list" aria-label="Tags">
-              {draft.tags.map((tag: string) => (
-                <span class="tag" role="listitem">{tag}</span>
-              ))}
-            </div>
-          )}
+          <div class="tags" role="list" aria-label="Tags">
+            <span class="tag" role="listitem">{category}</span>
+          </div>
         </header>
         
         <div class="docs-content" set:html={htmlContent} />
@@ -436,10 +411,74 @@ const nextUrl = hasNext ? `?tab=${validTabIndex + 1}` : null;
 
   .docs-content :global(pre) {
     background: var(--bg-secondary);
-    padding: 1rem;
+    padding: 0;
     border-radius: 8px;
-    overflow-x: auto;
+    overflow: hidden;
     margin: 1.5rem 0;
+    border: 1px solid var(--border);
+  }
+
+  .docs-content :global(.code-block-wrapper) {
+    position: relative;
+    margin: 1.5rem 0;
+  }
+
+  .docs-content :global(.code-block-header) {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    background: var(--bg-tertiary);
+    border-bottom: 1px solid var(--border);
+    border-radius: 8px 8px 0 0;
+  }
+
+  .docs-content :global(.code-language) {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--primary);
+    font-family: 'Courier New', monospace;
+  }
+
+  .docs-content :global(.code-copy-btn) {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.375rem 0.75rem;
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .docs-content :global(.code-copy-btn:hover) {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+  }
+
+  .docs-content :global(.code-copy-btn.copied) {
+    background: oklch(0.7 0.15 120);
+    color: white;
+    border-color: oklch(0.7 0.15 120);
+  }
+
+  .docs-content :global(.code-copy-btn svg) {
+    width: 14px;
+    height: 14px;
+  }
+
+  .docs-content :global(.code-block-wrapper pre) {
+    margin: 0;
+    border-radius: 0 0 8px 8px;
+    padding: 1rem;
+    overflow-x: auto;
   }
 
   .docs-content :global(code) {
@@ -452,6 +491,70 @@ const nextUrl = hasNext ? `?tab=${validTabIndex + 1}` : null;
     padding: 0.2rem 0.4rem;
     border-radius: 4px;
     font-size: 0.875rem;
+    color: var(--primary);
+    border: 1px solid var(--border);
+  }
+
+  /* Syntax Highlighting Colors */
+  .docs-content :global(.hljs) {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+  }
+
+  .docs-content :global(.hljs-keyword),
+  .docs-content :global(.hljs-selector-tag),
+  .docs-content :global(.hljs-literal),
+  .docs-content :global(.hljs-section),
+  .docs-content :global(.hljs-link) {
+    color: oklch(0.6 0.2 300); /* Purple */
+    font-weight: 600;
+  }
+
+  .docs-content :global(.hljs-string),
+  .docs-content :global(.hljs-attr),
+  .docs-content :global(.hljs-attribute) {
+    color: oklch(0.6 0.15 120); /* Green */
+  }
+
+  .docs-content :global(.hljs-number),
+  .docs-content :global(.hljs-built_in),
+  .docs-content :global(.hljs-builtin-name) {
+    color: oklch(0.65 0.2 60); /* Orange */
+  }
+
+  .docs-content :global(.hljs-function),
+  .docs-content :global(.hljs-title),
+  .docs-content :global(.hljs-class) {
+    color: oklch(0.65 0.2 240); /* Blue */
+    font-weight: 600;
+  }
+
+  .docs-content :global(.hljs-comment),
+  .docs-content :global(.hljs-quote) {
+    color: var(--text-secondary);
+    font-style: italic;
+  }
+
+  .docs-content :global(.hljs-variable),
+  .docs-content :global(.hljs-template-variable) {
+    color: oklch(0.6 0.2 0); /* Red */
+  }
+
+  .docs-content :global(.hljs-tag),
+  .docs-content :global(.hljs-name),
+  .docs-content :global(.hljs-selector-id),
+  .docs-content :global(.hljs-selector-class) {
+    color: oklch(0.6 0.2 300); /* Purple */
+  }
+
+  .docs-content :global(.hljs-regexp),
+  .docs-content :global(.hljs-meta) {
+    color: oklch(0.65 0.15 180); /* Cyan */
+  }
+
+  .docs-content :global(.hljs-symbol),
+  .docs-content :global(.hljs-bullet) {
+    color: oklch(0.65 0.2 240); /* Blue */
   }
 
   /* Pagination */
@@ -649,6 +752,31 @@ const nextUrl = hasNext ? `?tab=${validTabIndex + 1}` : null;
 
 <script is:inline>
   (function() {
+    // Copy code to clipboard
+    window.copyCode = function(codeId) {
+      const codeElement = document.getElementById(codeId);
+      if (!codeElement) return;
+      
+      const code = codeElement.textContent || '';
+      const button = event.target.closest('.code-copy-btn');
+      
+      navigator.clipboard.writeText(code).then(function() {
+        // Show success state
+        const originalText = button.querySelector('.copy-text').textContent;
+        button.classList.add('copied');
+        button.querySelector('.copy-text').textContent = 'Copied!';
+        
+        // Reset after 2 seconds
+        setTimeout(function() {
+          button.classList.remove('copied');
+          button.querySelector('.copy-text').textContent = originalText;
+        }, 2000);
+      }).catch(function(err) {
+        console.error('Failed to copy:', err);
+        alert('Failed to copy code');
+      });
+    };
+
     // TOC: Track active heading and precise scroll progress
     const tocLinks = document.querySelectorAll('.toc-link');
     const headings = document.querySelectorAll('.docs-content h2[id]');

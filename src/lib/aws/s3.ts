@@ -46,6 +46,11 @@ function shouldUseS3(): boolean {
   return true;
 }
 
+/** Export as isS3Enabled for external use */
+export function isS3Enabled(): boolean {
+  return shouldUseS3();
+}
+
 function getS3Client(): S3Client {
   if (!_client) {
     _client = new S3Client({ region: REGION });
@@ -207,3 +212,105 @@ export async function getPresignedDownloadUrl(
 }
 
 export { BUCKET, REGION, docKey };
+
+/** 
+ * Load complete doc content from S3 with tab parsing
+ * Returns markdown content parsed into tabs structure
+ */
+export async function getDocContent(
+  category: string,
+  slug: string
+): Promise<{ 
+  markdown: string; 
+  tabs: any[];
+  title: string;
+  description: string;
+  category: string;
+  slug: string;
+}> {
+  if (!isS3Enabled()) {
+    console.warn('⚠️  S3 not configured');
+    return { 
+      markdown: '', 
+      tabs: [], 
+      title: slug,
+      description: '',
+      category,
+      slug
+    };
+  }
+  
+  // Get markdown from S3
+  const markdown = await getMarkdown(category, slug);
+  
+  if (!markdown) {
+    return { 
+      markdown: '', 
+      tabs: [], 
+      title: slug,
+      description: '',
+      category,
+      slug
+    };
+  }
+  
+  // Parse tabs from markdown
+  const tabs = parseTabsFromMarkdown(markdown);
+  
+  // Extract title from first # heading
+  const titleMatch = markdown.match(/^#\s+(.+)$/m);
+  const title = titleMatch ? titleMatch[1] : slug.replace(/-/g, ' ');
+  
+  // Extract description (first paragraph after title)
+  const descMatch = markdown.match(/^#.+\n\n(.+)$/m);
+  const description = descMatch ? descMatch[1].substring(0, 160) : '';
+  
+  return {
+    markdown,
+    tabs,
+    title,
+    description,
+    category,
+    slug
+  };
+}
+
+/** 
+ * Parse tab structure from markdown content
+ * Supports tab markers: <!-- TAB: Title -->
+ */
+function parseTabsFromMarkdown(markdown: string): any[] {
+  // Check if markdown has tab markers: <!-- TAB: Title -->
+  const tabPattern = /<!--\s*TAB:\s*(.+?)\s*-->([\s\S]*?)(?=<!--\s*TAB:|$)/g;
+  const tabs: any[] = [];
+  let match;
+  let order = 0;
+  
+  while ((match = tabPattern.exec(markdown)) !== null) {
+    const title = match[1].trim();
+    const content = match[2].trim();
+    tabs.push({
+      id: `tab-${Date.now()}-${order}`,
+      title,
+      content,
+      order
+    });
+    order++;
+  }
+  
+  // If no tabs found, create single tab with all content
+  if (tabs.length === 0) {
+    // Extract title from first # heading
+    const titleMatch = markdown.match(/^#\s+(.+)$/m);
+    const title = titleMatch ? titleMatch[1] : 'Overview';
+    
+    tabs.push({
+      id: `tab-${Date.now()}-0`,
+      title,
+      content: markdown,
+      order: 0
+    });
+  }
+  
+  return tabs;
+}

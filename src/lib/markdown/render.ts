@@ -77,16 +77,34 @@ export async function renderMarkdown(markdown: string): Promise<string> {
 
   renderer.code = function({ text, lang }) {
     const code = String(text || '');
-    const language = String(lang || '');
+    const language = String(lang || 'plaintext');
+    const languageLabel = language.charAt(0).toUpperCase() + language.slice(1);
+    
+    // Generate unique ID for copy functionality
+    const codeId = `code-${Math.random().toString(36).substr(2, 9)}`;
     
     if (language && hljs.getLanguage(language)) {
       try {
         const highlighted = hljs.highlight(code, { language }).value;
-        return `<pre><code class="hljs language-${language}">${highlighted}</code></pre>`;
+        return `
+<div class="code-block-wrapper">
+  <div class="code-block-header">
+    <span class="code-language">${languageLabel}</span>
+    <button class="code-copy-btn" onclick="copyCode('${codeId}')" title="Copy code">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+      </svg>
+      <span class="copy-text">Copy</span>
+    </button>
+  </div>
+  <pre><code id="${codeId}" class="hljs language-${language}">${highlighted}</code></pre>
+</div>`;
       } catch (err) {
         console.error('Highlight error:', err);
       }
     }
+    
     // Escape HTML in code
     const escaped = code
       .replace(/&/g, '&amp;')
@@ -94,7 +112,21 @@ export async function renderMarkdown(markdown: string): Promise<string> {
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#039;');
-    return `<pre><code class="hljs">${escaped}</code></pre>`;
+    
+    return `
+<div class="code-block-wrapper">
+  <div class="code-block-header">
+    <span class="code-language">${languageLabel}</span>
+    <button class="code-copy-btn" onclick="copyCode('${codeId}')" title="Copy code">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+      </svg>
+      <span class="copy-text">Copy</span>
+    </button>
+  </div>
+  <pre><code id="${codeId}" class="hljs">${escaped}</code></pre>
+</div>`;
   };
   
   // Configure marked options
