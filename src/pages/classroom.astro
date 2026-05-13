@@ -1,0 +1,325 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Header from '../components/Header.astro';
+
+export const prerender = false;
+---
+
+<BaseLayout title="Classroom — XDoxs" description="Your personal learning dashboard">
+  <Header />
+
+  <main class="classroom-page" id="main-content">
+    <div class="cl-inner">
+
+      <!-- Page header -->
+      <div class="cl-header">
+        <nav class="breadcrumbs" aria-label="Breadcrumb" style="margin-bottom:0.75rem">
+          <a href="/">Home</a>
+          <span class="sep" aria-hidden="true">›</span>
+          <span class="current">Classroom</span>
+        </nav>
+        <h1>My Classroom</h1>
+        <p class="cl-sub">Track your progress and continue where you left off.</p>
+      </div>
+
+      <!-- Content loaded client-side -->
+      <div id="cl-content">
+        <div class="cl-loading" aria-live="polite">
+          <div class="cl-spinner" aria-hidden="true"></div>
+          <p>Loading your classroom…</p>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</BaseLayout>
+
+<style is:global>
+  /* ── Classroom page ── */
+  .classroom-page {
+    min-height: calc(100vh - var(--sl-nav-height));
+    background: var(--sl-color-bg);
+  }
+
+  .cl-inner {
+    max-width: var(--container);
+    margin: 0 auto;
+    padding: 2.5rem 1.5rem;
+  }
+
+  .cl-header {
+    margin-bottom: 2.5rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid var(--sl-color-hairline);
+  }
+
+  .cl-header h1 {
+    font-size: clamp(1.75rem, 4vw, 2.25rem);
+    color: var(--sl-color-gray-1);
+    margin-bottom: 0.4rem;
+  }
+
+  .cl-sub {
+    font-size: 0.95rem;
+    color: var(--sl-color-gray-3);
+    margin: 0;
+  }
+
+  /* Loading */
+  .cl-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    padding: 4rem 2rem;
+    color: var(--sl-color-gray-3);
+    font-size: 0.9rem;
+  }
+
+  .cl-spinner {
+    width: 2rem;
+    height: 2rem;
+    border: 3px solid var(--sl-color-hairline);
+    border-top-color: var(--sl-color-accent);
+    border-radius: 50%;
+    animation: cl-spin 0.8s linear infinite;
+  }
+
+  @keyframes cl-spin { to { transform: rotate(360deg); } }
+
+  @keyframes card-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Category sections */
+  .cl-cat-section {
+    margin-bottom: 2.5rem;
+  }
+
+  .cl-cat-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--sl-color-gray-2);
+    text-transform: capitalize;
+    margin-bottom: 1.25rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--sl-color-hairline);
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+  }
+
+  .cl-cat-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.4rem;
+    height: 1.4rem;
+    padding: 0 0.35rem;
+    background: var(--sl-color-accent-low);
+    color: var(--sl-color-accent);
+    border-radius: 999px;
+    font-size: 0.7rem;
+    font-weight: 700;
+  }
+
+  /* Section label */
+  .cl-section-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--sl-color-gray-4);
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--sl-color-hairline);
+    margin-bottom: 1.25rem;
+  }
+
+  /* Grid */
+  .cl-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+    gap: 1rem;
+  }
+
+  /* Card — same look as /learn subject-card */
+  .cl-grid .subject-card {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1.25rem;
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: 0.625rem;
+    background: var(--sl-color-bg-nav);
+    position: relative;
+    transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+    animation: card-in 0.35s ease-out both;
+  }
+  .cl-grid .subject-card:hover {
+    border-color: var(--sl-color-accent);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 6px oklch(0 0 0 / 0.25);
+  }
+
+  .cl-grid .sc-top {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .cl-grid .sc-name {
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: var(--sl-color-gray-1);
+    line-height: 1.3;
+  }
+
+  .cl-grid .sc-actions {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .cl-grid .sc-btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.45rem 0.75rem;
+    border-radius: 0.375rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+    border: none;
+    transition: opacity 0.15s ease;
+  }
+
+  .cl-grid .sc-btn-open {
+    background: var(--sl-color-accent);
+    color: var(--sl-color-black);
+  }
+  .cl-grid .sc-btn-open:hover { opacity: 0.85; color: var(--sl-color-black); }
+
+  /* ✕ corner button */
+  .sc-remove-x {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    width: 1.4rem;
+    height: 1.4rem;
+    border-radius: 50%;
+    border: none;
+    background: transparent;
+    color: var(--sl-color-gray-5);
+    font-size: 0.75rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s ease, color 0.15s ease;
+    line-height: 1;
+  }
+  .sc-remove-x:hover {
+    background: var(--sl-color-hairline);
+    color: oklch(0.6 0.2 25);
+  }
+
+  /* Empty state */
+  .cl-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 3rem 2rem;
+    border: 2px dashed var(--sl-color-hairline);
+    border-radius: 0.625rem;
+    text-align: center;
+    color: var(--sl-color-gray-3);
+    font-size: 0.9rem;
+  }
+
+  .cl-browse-btn {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.5rem 1.25rem;
+    background: var(--sl-color-accent);
+    color: var(--sl-color-black);
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+    font-weight: 700;
+    text-decoration: none;
+    transition: opacity 0.15s ease;
+    margin-top: 0.25rem;
+  }
+  .cl-browse-btn:hover { opacity: 0.85; color: var(--sl-color-black); }
+</style>
+
+<script is:inline>
+  (function () {
+    var KEY = 'xdoxs-classroom';
+
+    function getList() {
+      try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch (_) { return []; }
+    }
+    function saveList(list) { localStorage.setItem(KEY, JSON.stringify(list)); }
+
+    function renderClassroom() {
+      var list    = getList();
+      var content = document.getElementById('cl-content');
+      if (!content) return;
+
+      if (list.length === 0) {
+        content.innerHTML =
+          '<div class="cl-empty">' +
+            '<p>Your classroom is empty.</p>' +
+            '<p>Go to <a href="/learn" style="color:var(--sl-color-accent);font-weight:600">Learn</a> and click <strong>+ Classroom</strong> on any subject.</p>' +
+            '<a href="/learn" class="cl-browse-btn">Browse Docs</a>' +
+          '</div>';
+        return;
+      }
+
+      // Group by category
+      var grouped = {};
+      list.forEach(function (doc) {
+        if (!grouped[doc.category]) grouped[doc.category] = [];
+        grouped[doc.category].push(doc);
+      });
+
+      var html = '';
+      Object.keys(grouped).forEach(function (cat) {
+        var docs = grouped[cat];
+        html +=
+          '<section class="cl-cat-section">' +
+            '<h2 class="cl-cat-title">' + cat + '<span class="cl-cat-count">' + docs.length + '</span></h2>' +
+            '<div class="cl-grid">' +
+            docs.map(function (doc) {
+              return (
+                '<div class="subject-card" style="position:relative">' +
+                  '<button class="sc-remove-x" onclick="removeDoc(\'' + doc.id.replace(/'/g, "\\'") + '\')" aria-label="Remove ' + doc.title + '">✕</button>' +
+                  '<div class="sc-top">' +
+                    '<span class="badge badge-free">' + doc.category + '</span>' +
+                    '<span class="sc-name">' + doc.title + '</span>' +
+                  '</div>' +
+                  '<div class="sc-actions">' +
+                    '<a href="' + doc.url + '" class="sc-btn sc-btn-open">Open</a>' +
+                  '</div>' +
+                '</div>'
+              );
+            }).join('') +
+            '</div>' +
+          '</section>';
+      });
+
+      content.innerHTML = html;
+    }
+
+    window.removeDoc = function (id) {
+      saveList(getList().filter(function (d) { return d.id !== id; }));
+      renderClassroom();
+    };
+
+    renderClassroom();
+  })();
+</script>

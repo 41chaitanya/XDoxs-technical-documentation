@@ -21,6 +21,9 @@ const PUBLIC_ROUTES = [
   '/docs',
   '/learn',
   '/blogs',
+  '/pricing',
+  '/pyq',
+  '/classroom', // classroom handles its own auth redirect at page level
   '/api/auth/login',
   '/api/auth/register',
   '/api/auth/logout',

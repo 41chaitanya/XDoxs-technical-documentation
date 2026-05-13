@@ -6,8 +6,25 @@
  */
 
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
-import { readFileSync, readdirSync } from 'fs';
-import { join } from 'path';
+import { readFileSync } from 'fs';
+import { join, resolve } from 'path';
+
+// Load .env without requiring dotenv package
+function loadEnv() {
+  try {
+    const raw = readFileSync(resolve(process.cwd(), '.env'), 'utf-8');
+    for (const line of raw.split('\n')) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+      const eq = trimmed.indexOf('=');
+      if (eq === -1) continue;
+      const key = trimmed.slice(0, eq).trim();
+      const val = trimmed.slice(eq + 1).trim();
+      if (key && !(key in process.env)) process.env[key] = val;
+    }
+  } catch { /* rely on shell env */ }
+}
+loadEnv();
 
 const REGION = process.env.AWS_REGION || 'ap-south-2';
 const BUCKET = process.env.S3_DOCS_BUCKET || 'xdoxs-docs-656829';

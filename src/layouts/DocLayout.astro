@@ -16,7 +16,12 @@ interface Props {
   hasHinglish?: boolean;
 }
 
-const { title, description, date, author, category, tags, headings, docId, topicsEn = [], topicsHi = [], hasHinglish = false } = Astro.props;
+const {
+  title, description, date, author, category, tags,
+  headings, docId,
+  topicsEn = [], topicsHi = [],
+  hasHinglish = false,
+} = Astro.props;
 
 const canonicalURL = new URL(Astro.url.pathname, Astro.site);
 
@@ -24,23 +29,13 @@ const jsonLd = {
   '@context': 'https://schema.org',
   '@type': 'TechArticle',
   headline: title,
-  description: description,
-  author: {
-    '@type': 'Person',
-    name: author,
-  },
-  publisher: {
-    '@type': 'Organization',
-    name: 'XDoxs by Sheryians Coding School',
-    url: Astro.site?.toString(),
-  },
+  description,
+  author: { '@type': 'Person', name: author },
+  publisher: { '@type': 'Organization', name: 'XDoxs by Sheryians Coding School', url: Astro.site?.toString() },
   datePublished: date.toISOString(),
   dateModified: date.toISOString(),
   keywords: tags.join(', '),
-  mainEntityOfPage: {
-    '@type': 'WebPage',
-    '@id': canonicalURL.toString(),
-  },
+  mainEntityOfPage: { '@type': 'WebPage', '@id': canonicalURL.toString() },
   inLanguage: hasHinglish ? ['en', 'hi'] : ['en'],
 };
 
@@ -49,28 +44,25 @@ const breadcrumbLd = {
   '@type': 'BreadcrumbList',
   itemListElement: [
     { '@type': 'ListItem', position: 1, name: 'Home', item: Astro.site?.toString() },
-    { '@type': 'ListItem', position: 2, name: category, item: `${Astro.site}docs/${category}` },
-    { '@type': 'ListItem', position: 3, name: title },
+    { '@type': 'ListItem', position: 2, name: 'Learn', item: `${Astro.site}learn` },
+    { '@type': 'ListItem', position: 3, name: category, item: `${Astro.site}docs/${category}` },
+    { '@type': 'ListItem', position: 4, name: title },
   ],
 };
 ---
 
-<BaseLayout 
-  title={title} 
-  description={description} 
-  article={true}
-  publishedTime={date.toISOString()}
-  minimal={true}
->
+<BaseLayout title={title} description={description} article={true} publishedTime={date.toISOString()} minimal={true}>
   <Header />
-  
-  <div class="doc-container">
-    <!-- Left Sidebar: Topics Navigation -->
-    <aside class="topics-sidebar" aria-label="Topics navigation">
-      <div class="sidebar-content">
-        <div class="doc-info">
-          <p class="doc-title">{title}</p>
-          <span class="category-badge">{category}</span>
+
+  <div class="doc-layout">
+
+    <!-- ── Left sidebar: lesson tree ── -->
+    <aside class="doc-sidebar" aria-label="Lesson navigation">
+      <div class="ds-inner">
+        <div class="ds-doc-info">
+          <span class="ds-subject-label">{category}</span>
+          <p class="ds-doc-title">{title}</p>
+
           {hasHinglish && (
             <div class="lang-toggle" role="group" aria-label="Language selection">
               <button class="lang-btn active" id="btn-en" onclick="switchLanguage('en')" aria-pressed="true">English</button>
@@ -78,27 +70,27 @@ const breadcrumbLd = {
             </div>
           )}
         </div>
-        
+
         {topicsEn.length > 0 && (
-          <nav class="topics-nav" aria-label="Document topics">
-            <p class="topics-heading">Topics</p>
-            <ul class="topics-list topics-list-en" role="list">
-              {topicsEn.map((topic, index) => (
+          <nav class="ds-topics" aria-label="Document topics">
+            <p class="ds-topics-label">Topics</p>
+            <ul class="ds-topics-list ds-topics-en" role="list">
+              {topicsEn.map((t, i) => (
                 <li>
-                  <a href={`#${topic.slug}`} class="topic-link" data-slug={topic.slug}>
-                    <span class="topic-number" aria-hidden="true">{index + 1}</span>
-                    <span class="topic-title">{topic.text}</span>
+                  <a href={`#${t.slug}`} class="ds-topic-link" data-slug={t.slug}>
+                    <span class="ds-topic-num" aria-hidden="true">{i + 1}</span>
+                    <span class="ds-topic-text">{t.text}</span>
                   </a>
                 </li>
               ))}
             </ul>
             {hasHinglish && topicsHi.length > 0 && (
-              <ul class="topics-list topics-list-hi" style="display:none" role="list">
-                {topicsHi.map((topic, index) => (
+              <ul class="ds-topics-list ds-topics-hi" style="display:none" role="list">
+                {topicsHi.map((t, i) => (
                   <li>
-                    <a href={`#${topic.slug}`} class="topic-link" data-slug={topic.slug}>
-                      <span class="topic-number" aria-hidden="true">{index + 1}</span>
-                      <span class="topic-title">{topic.text}</span>
+                    <a href={`#${t.slug}`} class="ds-topic-link" data-slug={t.slug}>
+                      <span class="ds-topic-num" aria-hidden="true">{i + 1}</span>
+                      <span class="ds-topic-text">{t.text}</span>
                     </a>
                   </li>
                 ))}
@@ -108,539 +100,572 @@ const breadcrumbLd = {
         )}
       </div>
     </aside>
-    
+
+    <!-- ── Main content ── -->
     <main class="doc-main" id="main-content">
-      <nav class="breadcrumb" aria-label="Breadcrumb">
-        <ol>
-          <li><a href="/">Home</a></li>
-          <li aria-hidden="true">/</li>
-          <li><a href="/">Docs</a></li>
-          <li aria-hidden="true">/</li>
-          <li><span class="current" aria-current="page">{category}</span></li>
-        </ol>
+      <!-- Breadcrumbs -->
+      <nav class="breadcrumbs" aria-label="Breadcrumb" style="margin-bottom:1.5rem">
+        <a href="/">Home</a>
+        <span class="sep" aria-hidden="true">›</span>
+        <a href="/learn">Learn</a>
+        <span class="sep" aria-hidden="true">›</span>
+        <a href={`/learn`}>{category}</a>
+        <span class="sep" aria-hidden="true">›</span>
+        <span class="current">{title}</span>
       </nav>
-      
+
       <article class="doc-article" itemscope itemtype="https://schema.org/TechArticle">
         <header class="doc-header">
+          <span class="doc-subject-label">{category}</span>
           <h1 itemprop="headline">{title}</h1>
-          <p class="doc-description" itemprop="description">{description}</p>
-          
+
+          {hasHinglish && (
+            <div class="lang-toggle-main" role="group" aria-label="Language selection">
+              <button class="lang-btn-main active" id="main-btn-en" onclick="switchLanguage('en')" aria-pressed="true">English</button>
+              <button class="lang-btn-main" id="main-btn-hi" onclick="switchLanguage('hi')" aria-pressed="false">Hinglish</button>
+            </div>
+          )}
+
+          <p class="doc-desc" itemprop="description">{description}</p>
           <div class="doc-meta">
             <span itemprop="author">{author}</span>
-            <span aria-hidden="true">•</span>
+            <span aria-hidden="true">·</span>
             <time datetime={date.toISOString()} itemprop="datePublished">
               {date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
             </time>
           </div>
-          
-          <div class="tags" role="list" aria-label="Tags">
-            {tags.map(tag => (
-              <span class="tag" role="listitem">{tag}</span>
-            ))}
-          </div>
+          {tags.length > 0 && (
+            <div class="doc-tags" role="list" aria-label="Tags">
+              {tags.map(tag => <span class="badge badge-free" role="listitem">{tag}</span>)}
+            </div>
+          )}
         </header>
-        
+
         <div class="doc-content" itemprop="articleBody">
           <slot />
         </div>
       </article>
     </main>
+
+    <!-- ── Right TOC ── -->
+    <aside class="doc-toc" aria-label="Table of contents">
+      <p class="toc-label">On This Page</p>
+      {headings.filter(h => h.depth === 2).length > 0 ? (
+        <nav>
+          <ul class="toc-list" role="list">
+            {headings.filter(h => h.depth === 2).map(h => (
+              <li>
+                <a href={`#${h.slug}`} class="toc-link" data-slug={h.slug}>{h.text}</a>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      ) : (
+        <p class="toc-empty">No headings</p>
+      )}
+    </aside>
+
   </div>
-  
+
   <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
   <script type="application/ld+json" set:html={JSON.stringify(breadcrumbLd)} />
 </BaseLayout>
 
 <style>
-  .doc-container {
-    display: flex;
+  /* ── 3-column layout ── */
+  .doc-layout {
+    display: grid;
+    grid-template-columns: var(--sl-sidebar-width) 1fr 11rem;
+    min-height: calc(100vh - var(--sl-nav-height));
+    align-items: start;
   }
 
-  /* Topics Sidebar */
-  .topics-sidebar {
-    width: 280px;
-    background: var(--bg-secondary);
-    border-right: 1px solid var(--border);
-    height: calc(100vh - 64px);
+  /* ── Left sidebar ── */
+  .doc-sidebar {
     position: sticky;
-    top: 64px;
+    top: var(--sl-nav-height);
+    height: calc(100vh - var(--sl-nav-height));
     overflow-y: auto;
-    contain: layout style;
+    background: var(--sl-color-bg-sidebar);
+    border-right: 1px solid var(--sl-color-hairline-shade);
   }
 
-  .sidebar-content {
-    padding: 1.5rem;
-  }
+  .ds-inner { padding: 1.5rem 1rem; }
 
-  .doc-info {
+  .ds-doc-info {
     margin-bottom: 1.5rem;
-    padding-bottom: 1.5rem;
-    border-bottom: 1px solid var(--border);
+    padding-bottom: 1.25rem;
+    border-bottom: 1px solid var(--sl-color-hairline);
   }
 
-  .doc-title {
-    font-size: 1.125rem;
-    font-weight: 600;
-    margin-bottom: 0.75rem;
-    color: var(--text-primary);
-    line-height: 1.3;
-  }
-
-  .category-badge {
+  .ds-subject-label {
     display: inline-block;
-    padding: 0.25rem 0.75rem;
-    background: var(--primary-light);
-    color: var(--primary-dark);
-    border-radius: 999px;
-    font-size: 0.75rem;
-    font-weight: 600;
-    text-transform: capitalize;
-  }
-
-  .topics-heading {
-    font-size: 0.875rem;
-    font-weight: 600;
-    color: var(--text-secondary);
-    margin-bottom: 0.75rem;
+    font-size: 0.65rem;
+    font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.07em;
+    color: var(--sl-color-accent);
+    margin-bottom: 0.5rem;
   }
 
-  .topics-list {
-    list-style: none;
-    margin: 0;
-    padding: 0;
+  .ds-doc-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--sl-color-gray-1);
+    line-height: 1.4;
+    margin: 0 0 0.75rem;
   }
 
-  .topics-list li {
-    margin-bottom: 0.25rem;
+  /* Language toggle (sidebar) */
+  .lang-toggle {
+    display: flex;
+    border: 1px solid var(--sl-color-hairline);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    width: fit-content;
+  }
+  .lang-btn {
+    padding: 0.3rem 0.8rem;
+    background: transparent;
+    color: var(--sl-color-gray-3);
+    border: none;
+    cursor: pointer;
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+  .lang-btn.active {
+    background: var(--sl-color-accent);
+    color: var(--sl-color-black);
   }
 
-  .topic-link {
+  /* Topics */
+  .ds-topics-label {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--sl-color-gray-4);
+    margin-bottom: 0.5rem;
+  }
+  .ds-topics-list { list-style: none; margin: 0; padding: 0; }
+  .ds-topics-list li { margin-bottom: 0.15rem; }
+
+  .ds-topic-link {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
-    padding: 0.65rem 0.75rem;
-    border-radius: 6px;
-    color: var(--text-secondary);
-    font-size: 0.875rem;
-    transition: background 0.15s ease, color 0.15s ease;
-    border-left: 3px solid transparent;
+    gap: 0.6rem;
+    padding: 0.5rem 0.6rem;
+    border-radius: var(--radius-sm);
+    color: var(--sl-color-gray-3);
+    font-size: 0.82rem;
+    text-decoration: none;
+    border-left: 2px solid transparent;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  }
+  .ds-topic-link:hover {
+    background: var(--sl-color-hairline);
+    color: var(--sl-color-gray-1);
+  }
+  .ds-topic-link.active {
+    border-left-color: var(--sl-color-accent);
+    color: var(--sl-color-accent);
+    background: var(--sl-color-accent-low);
   }
 
-  .topic-link:hover {
-    background: var(--bg-primary);
-    color: var(--text-primary);
-  }
-
-  .topic-link.active {
-    background: var(--bg-primary);
-    border-left-color: var(--primary);
-  }
-
-  .topic-link.active .topic-title {
-    color: var(--primary);
-    font-weight: 500;
-  }
-
-  .topic-number {
+  .ds-topic-num {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 24px;
-    height: 24px;
-    background: var(--bg-tertiary);
+    width: 20px;
+    height: 20px;
+    background: var(--sl-color-hairline);
     border-radius: 4px;
-    font-size: 0.75rem;
-    font-weight: 600;
-    color: var(--text-secondary);
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--sl-color-gray-3);
     flex-shrink: 0;
   }
-
-  .topic-link.active .topic-number {
-    background: var(--primary);
-    color: white;
+  .ds-topic-link.active .ds-topic-num {
+    background: var(--sl-color-accent);
+    color: var(--sl-color-black);
   }
+  .ds-topic-text { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-  .topic-title {
-    flex: 1;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  /* Main Content */
+  /* ── Main content ── */
   .doc-main {
-    flex: 1;
-    max-width: 1100px;
+    padding: var(--sl-main-pad);
+    max-width: var(--sl-content-width);
     margin: 0 auto;
-    padding: 2rem 2rem;
+    width: 100%;
   }
 
-  .breadcrumb {
-    font-size: 0.875rem;
-    margin-bottom: 1.5rem;
-    color: var(--text-secondary);
-  }
-
-  .breadcrumb ol {
-    list-style: none;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    margin: 0;
-    padding: 0;
-  }
-
-  .breadcrumb a {
-    color: var(--text-secondary);
-  }
-
-  .breadcrumb a:hover {
-    color: var(--primary);
-  }
-
-  .breadcrumb .current {
-    color: var(--text-primary);
-    text-transform: capitalize;
-  }
-
-  .doc-article {
-    background: var(--bg-primary);
-    padding: 2.5rem;
-    border-radius: var(--radius);
-    box-shadow: var(--shadow);
-    contain: content;
-  }
+  /* ── Article header ── */
+  .doc-article { animation: card-in 0.3s ease-out both; }
 
   .doc-header {
     margin-bottom: 2rem;
-    padding-bottom: 2rem;
-    border-bottom: 1px solid var(--border);
-    contain: layout style;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid var(--sl-color-hairline);
+  }
+
+  .doc-subject-label {
+    display: inline-block;
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--sl-color-accent);
+    margin-bottom: 0.5rem;
   }
 
   .doc-header h1 {
-    font-size: 2.5rem;
-    margin-bottom: 1rem;
+    font-size: clamp(1.75rem, 4vw, 2.25rem);
+    margin-bottom: 0.75rem;
+    color: var(--sl-color-gray-1);
   }
 
-  .doc-description {
-    font-size: 1.25rem;
-    color: var(--text-secondary);
+  /* Language toggle (main) */
+  .lang-toggle-main {
+    display: flex;
+    border: 1px solid var(--sl-color-hairline);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    width: fit-content;
     margin-bottom: 1rem;
+  }
+  .lang-btn-main {
+    padding: 0.35rem 1rem;
+    background: transparent;
+    color: var(--sl-color-gray-3);
+    border: none;
+    cursor: pointer;
+    font-size: 0.82rem;
+    font-weight: 600;
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+  .lang-btn-main.active {
+    background: var(--sl-color-accent);
+    color: var(--sl-color-black);
+  }
+
+  .doc-desc {
+    font-size: 1.05rem;
+    color: var(--sl-color-gray-3);
+    margin-bottom: 0.75rem;
+    line-height: 1.6;
   }
 
   .doc-meta {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    font-size: 0.875rem;
-    color: var(--text-secondary);
-    margin-bottom: 1rem;
+    font-size: 0.82rem;
+    color: var(--sl-color-gray-4);
+    margin-bottom: 0.75rem;
   }
 
-  .tags {
+  .doc-tags {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.5rem;
-    min-height: 30px;
-    contain: layout style;
+    gap: 0.4rem;
   }
 
-  .tag {
-    padding: 0.25rem 0.75rem;
-    background: var(--primary-light);
-    color: var(--primary-dark);
-    border-radius: 999px;
-    font-size: 0.875rem;
-    font-weight: 600;
-  }
-
-  .doc-content {
-    line-height: 1.8;
-  }
+  /* ── Content body ── */
+  .doc-content { line-height: 1.8; }
 
   .doc-content :global(h2) {
-    margin-top: 2rem;
+    margin-top: 2.5rem;
     padding-bottom: 0.5rem;
-    border-bottom: 1px solid var(--border);
-    scroll-margin-top: 80px;
+    border-bottom: 1px solid var(--sl-color-hairline);
+    scroll-margin-top: calc(var(--sl-nav-height) + 1rem);
+    color: var(--sl-color-gray-1);
   }
-
   .doc-content :global(h3) {
-    margin-top: 1.5rem;
-    scroll-margin-top: 80px;
+    margin-top: 1.75rem;
+    scroll-margin-top: calc(var(--sl-nav-height) + 1rem);
+    color: var(--sl-color-gray-1);
+  }
+  .doc-content :global(h2[id]), .doc-content :global(h3[id]) {
+    scroll-margin-top: calc(var(--sl-nav-height) + 1rem);
   }
 
-  /* For set:html rendered content */
-  .doc-content :global(h2[id]) {
-    scroll-margin-top: 80px;
+  /* Language content blocks */
+  .doc-content :global(.doc-content-en),
+  .doc-content :global(.doc-content-hi) {
+    animation: lang-fade 0.2s ease both;
   }
 
-  /* Custom inline styles */
-  .doc-content :global(mark.doc-highlight) {
-    background: oklch(0.95 0.15 85);
-    color: oklch(0.3 0.1 85);
-    padding: 0.1rem 0.25rem;
-    border-radius: 3px;
-  }
-  .doc-content :global(u) { text-decoration: underline; }
-  /* Theme-aware accent color — changes automatically with theme */
-  .doc-content :global(.doc-color-accent) {
-    color: var(--primary);
-    font-weight: 500;
-  }
-
-  /* Language Toggle */
-  .lang-toggle {
-    display: flex;
-    gap: 0;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    overflow: hidden;
-    width: fit-content;
-    margin-top: 0.75rem;
-  }
-
-  .lang-btn {
-    padding: 0.4rem 1.1rem;
-    background: var(--bg-secondary);
-    color: var(--text-secondary);
-    border: none;
-    cursor: pointer;
-    font-size: 0.8rem;
-    font-weight: 600;
-    letter-spacing: 0.05em;
-    transition: background 0.15s ease, color 0.15s ease;
-  }
-
-  .lang-btn.active {
-    background: var(--primary);
-    color: white;
-  }
-
-  /* MCQ Blocks */
+  /* MCQ blocks */
   .doc-content :global(.mcq-block) {
-    background: var(--bg-secondary);
-    border: 1px solid var(--border);
-    border-radius: 10px;
+    background: var(--sl-color-bg-sidebar);
+    border: 1px solid var(--sl-color-hairline);
+    border-radius: var(--radius);
     padding: 1.5rem;
     margin: 1.5rem 0;
   }
-
   .doc-content :global(.mcq-question) {
     font-weight: 600;
     font-size: 1rem;
-    color: var(--text-primary);
+    color: var(--sl-color-gray-1);
     margin-bottom: 1rem;
   }
-
   .doc-content :global(.mcq-options) {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
     margin-bottom: 1rem;
   }
-
   .doc-content :global(.mcq-option) {
     display: flex;
     align-items: center;
     gap: 0.75rem;
     padding: 0.65rem 1rem;
-    border: 1px solid var(--border);
-    border-radius: 8px;
+    border: 1px solid var(--sl-color-hairline);
+    border-radius: var(--radius-sm);
     cursor: pointer;
     transition: border-color 0.15s ease, background 0.15s ease;
-    background: var(--bg-primary);
+    background: var(--sl-color-bg-nav);
   }
-
   .doc-content :global(.mcq-option:hover) {
-    border-color: var(--primary);
-    background: var(--primary-light);
+    border-color: var(--sl-color-accent);
+    background: var(--sl-color-accent-low);
   }
-
-  .doc-content :global(.mcq-option.selected) {
-    border-color: var(--primary);
-    background: var(--primary-light);
-  }
-
   .doc-content :global(.mcq-option.correct) {
     border-color: oklch(0.6 0.15 140);
-    background: oklch(0.95 0.05 140);
+    background: oklch(0.20 0.05 140);
   }
-
   .doc-content :global(.mcq-option.wrong) {
     border-color: oklch(0.6 0.2 27);
-    background: oklch(0.95 0.05 27);
+    background: oklch(0.20 0.05 27);
   }
-
   .doc-content :global(.mcq-letter) {
-    width: 28px;
-    height: 28px;
-    border-radius: 6px;
-    background: var(--bg-secondary);
+    width: 26px;
+    height: 26px;
+    border-radius: 5px;
+    background: var(--sl-color-hairline);
     display: flex;
     align-items: center;
     justify-content: center;
     font-weight: 700;
-    font-size: 0.8rem;
+    font-size: 0.78rem;
     flex-shrink: 0;
-    color: var(--text-secondary);
+    color: var(--sl-color-gray-3);
   }
-
-  .doc-content :global(.mcq-option.correct .mcq-letter) {
-    background: oklch(0.6 0.15 140);
-    color: white;
-  }
-
-  .doc-content :global(.mcq-option.wrong .mcq-letter) {
-    background: oklch(0.6 0.2 27);
-    color: white;
-  }
-
-  .doc-content :global(.mcq-text) {
-    font-size: 0.9rem;
-    color: var(--text-primary);
-  }
-
+  .doc-content :global(.mcq-option.correct .mcq-letter) { background: oklch(0.6 0.15 140); color: white; }
+  .doc-content :global(.mcq-option.wrong .mcq-letter)   { background: oklch(0.6 0.2 27);  color: white; }
+  .doc-content :global(.mcq-text) { font-size: 0.9rem; color: var(--sl-color-gray-1); }
   .doc-content :global(.mcq-submit) {
-    padding: 0.6rem 1.5rem;
-    background: var(--primary);
-    color: white;
+    padding: 0.55rem 1.25rem;
+    background: var(--sl-color-accent);
+    color: var(--sl-color-black);
     border: none;
-    border-radius: 8px;
-    font-weight: 600;
+    border-radius: var(--radius-sm);
+    font-weight: 700;
     cursor: pointer;
-    font-size: 0.9rem;
-    transition: background 0.15s ease;
+    font-size: 0.875rem;
+    transition: opacity 0.15s ease;
   }
-
-  .doc-content :global(.mcq-submit:hover) {
-    background: var(--primary-hover);
-  }
-
-  .doc-content :global(.mcq-submit:disabled) {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-
-  .doc-content :global(.mcq-result) {
-    margin-top: 1rem;
-  }
-
-  .doc-content :global(.mcq-feedback) {
-    font-weight: 600;
-    font-size: 0.95rem;
-    margin-bottom: 0.5rem;
-  }
-
+  .doc-content :global(.mcq-submit:hover) { opacity: 0.85; }
+  .doc-content :global(.mcq-submit:disabled) { opacity: 0.5; cursor: not-allowed; }
+  .doc-content :global(.mcq-result) { margin-top: 1rem; }
+  .doc-content :global(.mcq-feedback) { font-weight: 600; font-size: 0.95rem; margin-bottom: 0.5rem; }
   .doc-content :global(.mcq-explanation) {
     font-size: 0.875rem;
-    color: var(--text-secondary);
+    color: var(--sl-color-gray-3);
     padding: 0.75rem 1rem;
-    background: var(--bg-primary);
-    border-left: 3px solid var(--primary);
+    background: var(--sl-color-bg-nav);
+    border-left: 3px solid var(--sl-color-accent);
     border-radius: 4px;
     line-height: 1.6;
   }
 
-  @media (max-width: 1200px) {
-    .topics-sidebar {
-      width: 240px;
-    }
+  /* ── Right TOC ── */
+  .doc-toc {
+    position: sticky;
+    top: var(--sl-nav-height);
+    height: calc(100vh - var(--sl-nav-height));
+    overflow-y: auto;
+    padding: 1.5rem 0.75rem;
+    border-left: 1px solid var(--sl-color-hairline);
   }
 
-  @media (max-width: 1024px) {
-    .topics-sidebar {
-      display: none;
-    }
+  .toc-label {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--sl-color-gray-4);
+    margin-bottom: 0.75rem;
   }
 
-  @media (max-width: 768px) {
-    .doc-article {
-      padding: 1.5rem;
-    }
+  .toc-list { list-style: none; margin: 0; padding: 0; }
+  .toc-list li { margin-bottom: 0.15rem; position: relative; }
 
-    .doc-header h1 {
-      font-size: 2rem;
-    }
+  .toc-link {
+    display: block;
+    padding: 0.35rem 0.5rem 0.35rem 0.75rem;
+    font-size: 0.8rem;
+    color: var(--sl-color-gray-3);
+    text-decoration: none;
+    border-left: 2px solid var(--sl-color-hairline);
+    transition: color 0.15s ease, border-color 0.15s ease;
+    line-height: 1.4;
+    /* Fill bar via scaleY */
+    --fill: 0;
+  }
+  .toc-link::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 2px;
+    height: calc(var(--fill) * 100%);
+    background: var(--sl-color-accent);
+    border-radius: 1px;
+    transition: height 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .toc-link:hover { color: var(--sl-color-gray-1); border-left-color: var(--sl-color-gray-4); }
+  .toc-link.active { color: var(--sl-color-accent); border-left-color: var(--sl-color-accent); font-weight: 500; }
+  .toc-link.done { border-left-color: var(--sl-color-accent); }
+  .toc-link.done::after { height: 100%; }
+
+  .toc-empty { font-size: 0.8rem; color: var(--sl-color-gray-4); font-style: italic; }
+
+  /* ── Responsive ── */
+  @media (max-width: 60rem) {
+    .doc-layout { grid-template-columns: var(--sl-sidebar-width) 1fr; }
+    .doc-toc { display: none; }
+  }
+  @media (max-width: 50rem) {
+    .doc-layout { grid-template-columns: 1fr; }
+    .doc-sidebar { display: none; }
+    .doc-main { padding: 1.25rem; }
   }
 </style>
 
 <script is:inline>
-  // ─── Minimal doc-page interactivity — all deferred to idle time ───
-  function _initDoc() {
-    // Topic sidebar: event delegation + IntersectionObserver
-    var links = document.querySelectorAll('.topic-link');
-    var nav = document.querySelector('.topics-nav');
+  (function () {
+    // ── Sidebar topic links + IntersectionObserver ──
+    var links = document.querySelectorAll('.ds-topic-link');
+    var nav   = document.querySelector('.ds-topics');
     if (nav && links.length) {
-      nav.addEventListener('click', function(e) {
-        var a = e.target.closest('.topic-link');
+      nav.addEventListener('click', function (e) {
+        var a = e.target.closest('.ds-topic-link');
         if (!a) return;
         e.preventDefault();
-        var s = a.getAttribute('data-slug');
-        var t = s && document.getElementById(s);
-        if (t) {
-          t.scrollIntoView({behavior:'smooth',block:'start'});
-          history.pushState(null,'','#'+s);
-          links.forEach(function(l){l.classList.remove('active')});
+        var id = a.getAttribute('data-slug');
+        var el = id && document.getElementById(id);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          history.pushState(null, '', '#' + id);
+          links.forEach(function (l) { l.classList.remove('active'); });
           a.classList.add('active');
         }
       });
-      links[0].classList.add('active');
+      if (links[0]) links[0].classList.add('active');
       var hh = document.querySelectorAll('.doc-content h2[id]');
       if (hh.length) {
-        var obs = new IntersectionObserver(function(entries) {
-          entries.forEach(function(en) {
+        var obs = new IntersectionObserver(function (entries) {
+          entries.forEach(function (en) {
             if (en.isIntersecting) {
               var id = en.target.id;
-              links.forEach(function(l){ l.classList.toggle('active', l.getAttribute('data-slug')===id); });
+              links.forEach(function (l) { l.classList.toggle('active', l.getAttribute('data-slug') === id); });
             }
           });
-        }, {rootMargin:'-80px 0px -70% 0px'});
-        hh.forEach(function(h){obs.observe(h)});
+        }, { rootMargin: '-80px 0px -70% 0px' });
+        hh.forEach(function (h) { obs.observe(h); });
       }
     }
-    // MCQ: event delegation on doc-content
-    var dc = document.querySelector('.doc-content');
-    if (dc) dc.addEventListener('click', function(e) {
-      var opt = e.target.closest('.mcq-option');
-      if (opt) {
-        var blk = opt.closest('.mcq-block');
-        if (blk) { blk.querySelectorAll('.mcq-option').forEach(function(o){o.classList.remove('selected')}); opt.classList.add('selected'); }
+
+    // ── TOC scroll progress ──
+    var tocLinks = document.querySelectorAll('.toc-link');
+    var headings = document.querySelectorAll('.doc-content h2[id]');
+    if (tocLinks.length && headings.length) {
+      function updateToc() {
+        var scrollTop = window.scrollY;
+        headings.forEach(function (h, i) {
+          var top  = h.offsetTop - 100;
+          var next = headings[i + 1];
+          var bot  = next ? next.offsetTop - 100 : document.documentElement.scrollHeight;
+          var link = Array.from(tocLinks).find(function (l) { return l.getAttribute('data-slug') === h.id; });
+          if (!link) return;
+          link.classList.remove('active', 'done');
+          if (scrollTop < top) {
+            link.style.setProperty('--fill', '0');
+          } else if (scrollTop >= top && scrollTop < bot) {
+            link.classList.add('active');
+            var prog = Math.min(Math.max((scrollTop - top) / (bot - top), 0), 1);
+            link.style.setProperty('--fill', String(prog));
+          } else {
+            link.classList.add('done');
+            link.style.setProperty('--fill', '1');
+          }
+        });
       }
+      var ticking = false;
+      window.addEventListener('scroll', function () {
+        if (!ticking) {
+          requestAnimationFrame(function () { updateToc(); ticking = false; });
+          ticking = true;
+        }
+      });
+      updateToc();
+    }
+
+    // TOC click smooth scroll
+    tocLinks.forEach(function (l) {
+      l.addEventListener('click', function (e) {
+        e.preventDefault();
+        var id = l.getAttribute('data-slug');
+        var el = id && document.getElementById(id);
+        if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); history.pushState(null, '', '#' + id); }
+      });
     });
-    // MCQ check function
-    window.checkMcq = function(id) {
+
+    // ── MCQ ──
+    var dc = document.querySelector('.doc-content');
+    if (dc) {
+      dc.addEventListener('click', function (e) {
+        var opt = e.target.closest('.mcq-option');
+        if (opt) {
+          var blk = opt.closest('.mcq-block');
+          if (blk) { blk.querySelectorAll('.mcq-option').forEach(function (o) { o.classList.remove('selected'); }); opt.classList.add('selected'); }
+        }
+      });
+    }
+    window.checkMcq = function (id) {
       var b = document.getElementById(id);
       if (!b) return;
       var sel = b.querySelector('input[type="radio"]:checked');
-      if (!sel) { b.style.outline='2px solid oklch(0.6 0.2 27)'; setTimeout(function(){b.style.outline=''},1000); return; }
+      if (!sel) return;
       var ca = b.getAttribute('data-answer'), sv = sel.value, sb = b.querySelector('.mcq-submit');
-      b.querySelectorAll('input[type="radio"]').forEach(function(r){r.disabled=true});
+      b.querySelectorAll('input[type="radio"]').forEach(function (r) { r.disabled = true; });
       if (sb) sb.disabled = true;
-      b.querySelectorAll('.mcq-option').forEach(function(o) {
+      b.querySelectorAll('.mcq-option').forEach(function (o) {
         var lt = o.getAttribute('data-letter');
-        if (lt===ca) o.classList.add('correct');
-        else if (lt===sv) o.classList.add('wrong');
+        if (lt === ca) o.classList.add('correct');
+        else if (lt === sv) o.classList.add('wrong');
       });
       var rs = b.querySelector('.mcq-result'), fb = b.querySelector('.mcq-feedback');
-      if (rs) rs.style.display='block';
-      if (fb) { var ok=sv===ca; fb.textContent=ok?'Correct!':'Wrong! Correct answer is '+ca; fb.style.color=ok?'oklch(0.5 0.15 140)':'oklch(0.5 0.2 27)'; }
+      if (rs) rs.style.display = 'block';
+      if (fb) { var ok = sv === ca; fb.textContent = ok ? 'Correct!' : 'Wrong! Correct answer is ' + ca; fb.style.color = ok ? 'oklch(0.5 0.15 140)' : 'oklch(0.5 0.2 27)'; }
     };
-    // Language toggle
-    window.switchLanguage = function(lang) {
-      var en=document.querySelector('.doc-content-en'),hi=document.querySelector('.doc-content-hi');
-      var be=document.getElementById('btn-en'),bh=document.getElementById('btn-hi');
-      var te=document.querySelector('.topics-list-en'),th=document.querySelector('.topics-list-hi');
-      var isHi=lang==='hi';
-      if(en)en.style.display=isHi?'none':'block'; if(hi)hi.style.display=isHi?'block':'none';
-      if(te)te.style.display=isHi?'none':'block'; if(th)th.style.display=isHi?'block':'none';
-      if(be)be.classList.toggle('active',!isHi); if(bh)bh.classList.toggle('active',isHi);
+
+    // ── Language toggle ──
+    window.switchLanguage = function (lang) {
+      var en = document.querySelector('.doc-content-en'), hi = document.querySelector('.doc-content-hi');
+      var be = document.getElementById('btn-en'), bh = document.getElementById('btn-hi');
+      var mbe = document.getElementById('main-btn-en'), mbh = document.getElementById('main-btn-hi');
+      var te = document.querySelector('.ds-topics-en'), th = document.querySelector('.ds-topics-hi');
+      var isHi = lang === 'hi';
+      if (en) en.style.display = isHi ? 'none' : 'block';
+      if (hi) hi.style.display = isHi ? 'block' : 'none';
+      if (te) te.style.display = isHi ? 'none' : 'block';
+      if (th) th.style.display = isHi ? 'block' : 'none';
+      [be, mbe].forEach(function (b) { if (b) b.classList.toggle('active', !isHi); });
+      [bh, mbh].forEach(function (b) { if (b) b.classList.toggle('active', isHi); });
     };
-  }
-  // Defer ALL work to idle time — zero main-thread blocking
-  if (window.requestIdleCallback) requestIdleCallback(_initDoc);
-  else setTimeout(_initDoc, 1);
+  })();
 </script>

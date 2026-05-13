@@ -1,151 +1,118 @@
 ---
-import { getDocContent, isS3Enabled } from '../../lib/aws/s3';
+import { fetchDocFromCdn } from '../../lib/aws/cdn';
 import { renderMarkdown } from '../../lib/markdown/render';
 import { extractH2Headings } from '../../lib/markdown/headings';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import Header from '../../components/Header.astro';
 
-// ✅ SSR Mode: Fetch from S3 at runtime
 export const prerender = false;
 
 const { slug } = Astro.params;
 const slugPath = Array.isArray(slug) ? slug.join('/') : (slug ?? '');
-
 const parts = slugPath.split('/');
 const category = parts[0];
-const docSlug = parts[1];
+const docSlug  = parts[1];
 const tabParam = Astro.url.searchParams.get('tab') || '0';
 const currentTabIndex = parseInt(tabParam);
 
 if (!category || !docSlug) return Astro.redirect('/');
 
-// Check if S3 is enabled
-if (!isS3Enabled()) {
-  return Astro.redirect('/?error=s3-not-configured');
+const markdown = await fetchDocFromCdn(category, docSlug);
+if (!markdown) return Astro.redirect('/');
+
+// Parse tabs from H1 headings
+function parseTabsFromMarkdown(md: string) {
+  const lines = md.split('\n');
+  const tabs: { title: string; content: string }[] = [];
+  let currentTitle = '';
+  let currentLines: string[] = [];
+  for (const line of lines) {
+    const m = line.match(/^#\s+(.+)$/);
+    if (m) {
+      if (currentTitle) tabs.push({ title: currentTitle, content: currentLines.join('\n').trim() });
+      currentTitle = m[1].trim();
+      currentLines = [];
+    } else {
+      currentLines.push(line);
+    }
+  }
+  if (currentTitle) tabs.push({ title: currentTitle, content: currentLines.join('\n').trim() });
+  if (tabs.length === 0) tabs.push({ title: docSlug.replace(/-/g, ' '), content: md });
+  return tabs;
 }
 
-// Fetch doc from S3
-const docData = await getDocContent(category, docSlug);
-
-if (!docData.markdown || docData.tabs.length === 0) {
-  return Astro.redirect('/');
-}
-
-const { tabs, title, description } = docData;
-
-// Validate tab index
+const tabs = parseTabsFromMarkdown(markdown);
 const validTabIndex = Math.max(0, Math.min(currentTabIndex, tabs.length - 1));
 const currentTab = tabs[validTabIndex];
-
-// Render current tab content
 const htmlContent = await renderMarkdown(currentTab.content);
-
-// Extract H2 headings for TOC
 const h2Headings = extractH2Headings(currentTab.content);
-
-const publishedAt = new Date();
-
-// Pagination
+const title = tabs[0].title;
+const description = `Learn about ${title}`;
 const hasPrevious = validTabIndex > 0;
 const hasNext = validTabIndex < tabs.length - 1;
 const previousUrl = hasPrevious ? `?tab=${validTabIndex - 1}` : null;
 const nextUrl = hasNext ? `?tab=${validTabIndex + 1}` : null;
+const publishedAt = new Date();
 ---
 
-<BaseLayout 
-  title={`${currentTab.title} - ${title}`}
-  description={description || `Learn about ${currentTab.title} in this comprehensive guide.`}
+<BaseLayout
+  title={`${currentTab.title} — ${title}`}
+  description={description}
   article={true}
   publishedTime={publishedAt.toISOString()}
   minimal={true}
 >
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" />
   <Header />
-  
-  <!-- Structured Data for Article -->
+
+  <!-- Structured data -->
   <script type="application/ld+json" set:html={JSON.stringify({
     '@context': 'https://schema.org',
     '@type': 'TechArticle',
     headline: currentTab.title,
-    description: description || `Learn about ${currentTab.title}`,
-    author: {
-      '@type': 'Person',
-      name: 'XDoxs Team'
-    },
+    description,
+    author: { '@type': 'Person', name: 'XDoxs Team' },
     datePublished: publishedAt.toISOString(),
     dateModified: publishedAt.toISOString(),
-    publisher: {
-      '@type': 'Organization',
-      name: 'XDoxs',
-      logo: {
-        '@type': 'ImageObject',
-        url: `${Astro.site}favicon.svg`
-      }
-    },
-    mainEntityOfPage: {
-      '@type': 'WebPage',
-      '@id': Astro.url.href
-    },
+    publisher: { '@type': 'Organization', name: 'XDoxs', logo: { '@type': 'ImageObject', url: `${Astro.site}favicon.svg` } },
+    mainEntityOfPage: { '@type': 'WebPage', '@id': Astro.url.href },
     keywords: category,
     articleSection: category,
-    inLanguage: 'en-US'
+    inLanguage: 'en-US',
   })} />
-
-  <!-- Breadcrumb Structured Data -->
   <script type="application/ld+json" set:html={JSON.stringify({
     '@context': 'https://schema.org',
     '@type': 'BreadcrumbList',
     itemListElement: [
-      {
-        '@type': 'ListItem',
-        position: 1,
-        name: 'Home',
-        item: Astro.site?.toString()
-      },
-      {
-        '@type': 'ListItem',
-        position: 2,
-        name: 'Documentation',
-        item: `${Astro.site}learn`
-      },
-      {
-        '@type': 'ListItem',
-        position: 3,
-        name: category,
-        item: `${Astro.site}docs/${category}`
-      },
-      {
-        '@type': 'ListItem',
-        position: 4,
-        name: title,
-        item: Astro.url.href
-      }
-    ]
+      { '@type': 'ListItem', position: 1, name: 'Home',          item: Astro.site?.toString() },
+      { '@type': 'ListItem', position: 2, name: 'Learn',         item: `${Astro.site}learn` },
+      { '@type': 'ListItem', position: 3, name: category,        item: `${Astro.site}docs/${category}` },
+      { '@type': 'ListItem', position: 4, name: title,           item: Astro.url.href },
+    ],
   })} />
-  
-  <div class="docs-container">
-    <!-- Left Sidebar: Navigation Tree -->
-    <aside class="tabs-sidebar" aria-label="Documentation navigation">
-      <div class="sidebar-header">
-        <div class="doc-category">{category}</div>
-        <h2 class="doc-title">{title}</h2>
+
+  <div class="docs-layout">
+
+    <!-- ── Left sidebar ── -->
+    <aside class="docs-sidebar" aria-label="Documentation navigation">
+      <div class="ds-header">
+        <span class="ds-category">{category}</span>
+        <h2 class="ds-title">{title}</h2>
       </div>
-      
-      <nav class="tabs-nav" aria-label="Document sections">
-        <div id="nav-tree-wrapper">
-          <!-- Navigation tree will be loaded here -->
-        </div>
-        
-        <!-- Fallback: Tab navigation if no tree structure -->
-        <ul class="tabs-list" role="list" id="tabs-fallback">
-          {tabs.map((tab: any, index: number) => (
+
+      <nav class="ds-nav" aria-label="Document sections">
+        <div id="nav-tree-wrapper"></div>
+
+        <!-- Fallback tab list -->
+        <ul class="tabs-list" id="tabs-fallback" role="list" style="display:none">
+          {tabs.map((tab: any, i: number) => (
             <li>
-              <a 
-                href={`?tab=${index}`}
-                class={`tab-link ${index === validTabIndex ? 'active' : ''}`}
-                aria-current={index === validTabIndex ? 'page' : undefined}
+              <a
+                href={`?tab=${i}`}
+                class={`tab-link ${i === validTabIndex ? 'active' : ''}`}
+                aria-current={i === validTabIndex ? 'page' : undefined}
               >
-                <span class="tab-number" aria-hidden="true">{index + 1}</span>
+                <span class="tab-num" aria-hidden="true">{i + 1}</span>
                 <span class="tab-title">{tab.title}</span>
               </a>
             </li>
@@ -153,496 +120,363 @@ const nextUrl = hasNext ? `?tab=${validTabIndex + 1}` : null;
         </ul>
       </nav>
     </aside>
-    
-    <!-- Main Content -->
+
+    <!-- ── Main content ── -->
     <main class="docs-main" id="main-content">
+      <!-- Breadcrumbs -->
+      <nav class="breadcrumbs" aria-label="Breadcrumb" style="margin-bottom:1.5rem">
+        <a href="/">Home</a>
+        <span class="sep" aria-hidden="true">›</span>
+        <a href="/learn">Learn</a>
+        <span class="sep" aria-hidden="true">›</span>
+        <a href={`/learn`}>{category}</a>
+        <span class="sep" aria-hidden="true">›</span>
+        <span class="current">{currentTab.title}</span>
+      </nav>
+
       <article class="docs-article">
         <header class="docs-header">
           <div class="docs-meta">
             <span>XDoxs Team</span>
-            <span aria-hidden="true">•</span>
+            <span aria-hidden="true">·</span>
             <time datetime={publishedAt.toISOString()}>
               {publishedAt.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
             </time>
           </div>
-          
-          <div class="tags" role="list" aria-label="Tags">
-            <span class="tag" role="listitem">{category}</span>
+          <div class="docs-header-row">
+            <div class="docs-tags">
+              <span class="badge badge-free">{category}</span>
+            </div>
+            <button
+              class="add-to-classroom-btn"
+              id="add-to-classroom"
+              data-category={category}
+              data-slug={docSlug}
+              data-title={title}
+              data-url={`/docs/${category}/${docSlug}`}
+              aria-label="Add to Classroom"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+              <span id="atc-label">Add to Classroom</span>
+            </button>
           </div>
         </header>
-        
+
         <div class="docs-content" set:html={htmlContent} />
 
         <!-- Pagination -->
         <nav class="pagination" aria-label="Page navigation">
           {hasPrevious ? (
-            <a href={previousUrl} class="pagination-btn prev">
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="15 18 9 12 15 6"></polyline>
-              </svg>
+            <a href={previousUrl} class="pag-btn pag-prev">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
               <div>
-                <div class="pagination-label">Previous</div>
-                <div class="pagination-title">{tabs[validTabIndex - 1].title}</div>
+                <div class="pag-label">Previous</div>
+                <div class="pag-title">{tabs[validTabIndex - 1].title}</div>
               </div>
             </a>
-          ) : (
-            <div></div>
-          )}
-          
+          ) : <div />}
+
           {hasNext && (
-            <a href={nextUrl} class="pagination-btn next">
+            <a href={nextUrl} class="pag-btn pag-next">
               <div>
-                <div class="pagination-label">Next</div>
-                <div class="pagination-title">{tabs[validTabIndex + 1].title}</div>
+                <div class="pag-label">Next</div>
+                <div class="pag-title">{tabs[validTabIndex + 1].title}</div>
               </div>
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="9 18 15 12 9 6"></polyline>
-              </svg>
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
             </a>
           )}
         </nav>
       </article>
     </main>
 
-    <!-- Right Sidebar: Table of Contents -->
-    <aside class="toc-sidebar" aria-label="Table of contents">
-      <div class="toc-header">
-        <h3>On This Page</h3>
-      </div>
-      
+    <!-- ── Right TOC ── -->
+    <aside class="docs-toc" aria-label="Table of contents">
+      <p class="toc-label">On This Page</p>
       {h2Headings.length > 0 ? (
-        <nav class="toc-nav">
+        <nav>
           <ul class="toc-list" role="list">
-            {h2Headings.map((heading: any) => (
+            {h2Headings.map((h: any) => (
               <li>
-                <a href={`#${heading.slug}`} class="toc-link" data-slug={heading.slug}>
-                  {heading.text}
-                </a>
+                <a href={`#${h.slug}`} class="toc-link" data-slug={h.slug}>{h.text}</a>
               </li>
             ))}
           </ul>
-          <div class="toc-progress" id="toc-progress"></div>
         </nav>
       ) : (
-        <p class="toc-empty">No headings in this section</p>
+        <p class="toc-empty">No headings</p>
       )}
     </aside>
+
   </div>
 </BaseLayout>
 
 <style>
-  .docs-container {
+  /* ── 3-column layout ── */
+  .docs-layout {
     display: grid;
-    grid-template-columns: 280px 1fr 240px;
-    gap: 2rem;
-    max-width: 1600px;
-    margin: 0 auto;
+    grid-template-columns: var(--sl-sidebar-width) 1fr 11rem;
+    min-height: calc(100vh - var(--sl-nav-height));
+    align-items: start;
   }
 
-  /* Tabs Sidebar (Left) */
-  .tabs-sidebar {
-    background: var(--bg-secondary);
-    border-right: 1px solid var(--border);
-    height: calc(100vh - 64px);
+  /* ── Left sidebar ── */
+  .docs-sidebar {
     position: sticky;
-    top: 64px;
+    top: var(--sl-nav-height);
+    height: calc(100vh - var(--sl-nav-height));
     overflow-y: auto;
-    padding: 1.5rem;
+    background: var(--sl-color-bg-sidebar);
+    border-right: 1px solid var(--sl-color-hairline-shade);
+    padding: 1.5rem 1rem;
   }
 
-  .sidebar-header {
-    margin-bottom: 1.5rem;
-    padding-bottom: 1.5rem;
-    border-bottom: 1px solid var(--border);
+  .ds-header {
+    margin-bottom: 1.25rem;
+    padding-bottom: 1.25rem;
+    border-bottom: 1px solid var(--sl-color-hairline);
   }
 
-  .doc-category {
+  .ds-category {
     display: inline-block;
-    padding: 0.25rem 0.75rem;
-    background: var(--primary-light);
-    color: var(--primary);
-    border-radius: 999px;
-    font-size: 0.75rem;
-    font-weight: 600;
+    font-size: 0.65rem;
+    font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
-    margin-bottom: 0.75rem;
+    letter-spacing: 0.07em;
+    color: var(--sl-color-accent);
+    margin-bottom: 0.4rem;
   }
 
-  .doc-title {
-    font-size: 1.125rem;
+  .ds-title {
+    font-size: 0.9rem;
     font-weight: 600;
-    color: var(--text-primary);
-    line-height: 1.3;
+    color: var(--sl-color-gray-1);
+    line-height: 1.4;
     margin: 0;
   }
 
-  .tabs-list {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: none;
-  }
-
-  .tabs-list li {
-    margin-bottom: 0.25rem;
-  }
-
-  #nav-tree-wrapper :global(.nav-folder) {
-    margin-bottom: 0.5rem;
-  }
-
+  /* Nav tree */
+  #nav-tree-wrapper :global(.nav-folder) { margin-bottom: 0.35rem; }
   #nav-tree-wrapper :global(.nav-folder-header) {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    padding: 0.75rem;
+    padding: 0.55rem 0.6rem;
     cursor: pointer;
-    border-radius: 8px;
-    transition: all 0.15s ease;
-    border-left: 3px solid transparent;
+    border-radius: var(--radius-sm);
+    transition: background 0.15s ease;
   }
-
-  #nav-tree-wrapper :global(.nav-folder-header:hover) {
-    background: var(--bg-primary);
-  }
-
+  #nav-tree-wrapper :global(.nav-folder-header:hover) { background: var(--sl-color-hairline); }
   #nav-tree-wrapper :global(.nav-folder-icon) {
-    font-size: 0.75rem;
+    font-size: 0.65rem;
     transition: transform 0.2s;
-    color: var(--text-secondary);
+    color: var(--sl-color-gray-4);
   }
-
-  #nav-tree-wrapper :global(.nav-folder.expanded .nav-folder-icon) {
-    transform: rotate(90deg);
-  }
-
+  #nav-tree-wrapper :global(.nav-folder.expanded .nav-folder-icon) { transform: rotate(90deg); }
   #nav-tree-wrapper :global(.nav-folder-name) {
     flex: 1;
     font-weight: 500;
-    color: var(--text-primary);
-    font-size: 0.9rem;
+    color: var(--sl-color-gray-2);
+    font-size: 0.85rem;
   }
-
-  #nav-tree-wrapper :global(.nav-folder-children) {
-    display: none;
-    padding-left: 1rem;
-    margin-top: 0.25rem;
-  }
-
-  #nav-tree-wrapper :global(.nav-folder.expanded .nav-folder-children) {
-    display: block;
-  }
-
+  #nav-tree-wrapper :global(.nav-folder-children) { display: none; padding-left: 0.75rem; margin-top: 0.15rem; }
+  #nav-tree-wrapper :global(.nav-folder.expanded .nav-folder-children) { display: block; }
   #nav-tree-wrapper :global(.nav-doc-link) {
     display: block;
-    padding: 0.75rem;
-    color: var(--text-secondary);
+    padding: 0.5rem 0.6rem;
+    color: var(--sl-color-gray-3);
     text-decoration: none;
-    border-radius: 8px;
-    transition: all 0.15s ease;
-    font-size: 0.9rem;
-    border-left: 3px solid transparent;
-    margin-bottom: 0.25rem;
+    border-radius: var(--radius-sm);
+    border-left: 2px solid transparent;
+    font-size: 0.83rem;
+    margin-bottom: 0.15rem;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
   }
-
-  #nav-tree-wrapper :global(.nav-doc-link:hover) {
-    background: var(--bg-primary);
-    color: var(--text-primary);
-  }
-
+  #nav-tree-wrapper :global(.nav-doc-link:hover) { background: var(--sl-color-hairline); color: var(--sl-color-gray-1); }
   #nav-tree-wrapper :global(.nav-doc-link.active) {
-    background: var(--bg-primary);
-    border-left-color: var(--primary);
-    color: var(--primary);
+    border-left-color: var(--sl-color-accent);
+    color: var(--sl-color-accent);
+    background: var(--sl-color-accent-low);
     font-weight: 500;
   }
 
-  #nav-tree-wrapper :global(.nav-level-1) {
-    padding-left: 1rem;
-  }
-
-  #nav-tree-wrapper :global(.nav-level-2) {
-    padding-left: 2rem;
-  }
-
-  #nav-tree-wrapper :global(.nav-level-3) {
-    padding-left: 3rem;
-  }
-
+  /* Tabs fallback */
+  .tabs-list { list-style: none; margin: 0; padding: 0; }
+  .tabs-list li { margin-bottom: 0.15rem; }
   .tab-link {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
-    padding: 0.75rem;
-    border-radius: 8px;
-    color: var(--text-secondary);
-    font-size: 0.9rem;
-    transition: all 0.15s ease;
-    border-left: 3px solid transparent;
+    gap: 0.6rem;
+    padding: 0.55rem 0.6rem;
+    border-radius: var(--radius-sm);
+    color: var(--sl-color-gray-3);
+    font-size: 0.83rem;
+    text-decoration: none;
+    border-left: 2px solid transparent;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
   }
-
-  .tab-link:hover {
-    background: var(--bg-primary);
-    color: var(--text-primary);
-  }
-
+  .tab-link:hover { background: var(--sl-color-hairline); color: var(--sl-color-gray-1); }
   .tab-link.active {
-    background: var(--bg-primary);
-    border-left-color: var(--primary);
-    color: var(--primary);
+    border-left-color: var(--sl-color-accent);
+    color: var(--sl-color-accent);
+    background: var(--sl-color-accent-low);
     font-weight: 500;
   }
-
-  .tab-number {
+  .tab-num {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 28px;
-    height: 28px;
-    background: var(--bg-tertiary);
-    border-radius: 6px;
-    font-size: 0.8rem;
-    font-weight: 600;
-    color: var(--text-secondary);
+    width: 20px;
+    height: 20px;
+    background: var(--sl-color-hairline);
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--sl-color-gray-3);
     flex-shrink: 0;
   }
+  .tab-link.active .tab-num { background: var(--sl-color-accent); color: var(--sl-color-black); }
+  .tab-title { flex: 1; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 
-  .tab-link.active .tab-number {
-    background: var(--primary);
-    color: white;
-  }
-
-  .tab-title {
-    flex: 1;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-  }
-
-  /* Main Content */
+  /* ── Main content ── */
   .docs-main {
-    padding: 2rem;
-    min-height: calc(100vh - 64px);
+    padding: var(--sl-main-pad);
+    min-height: calc(100vh - var(--sl-nav-height));
   }
 
-  .docs-article {
-    max-width: 800px;
-  }
+  .docs-article { max-width: var(--sl-content-width); animation: card-in 0.3s ease-out both; }
 
   .docs-header {
-    margin-bottom: 2rem;
-    padding-bottom: 1.5rem;
-    border-bottom: 1px solid var(--border);
+    margin-bottom: 1.5rem;
+    padding-bottom: 1.25rem;
+    border-bottom: 1px solid var(--sl-color-hairline);
   }
 
   .docs-meta {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    font-size: 0.875rem;
-    color: var(--text-secondary);
-    margin-bottom: 1rem;
+    font-size: 0.8rem;
+    color: var(--sl-color-gray-4);
+    margin-bottom: 0.75rem;
   }
 
-  .tags {
+  .docs-tags { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+
+  /* Add to Classroom */
+  .docs-header-row {
     display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
     flex-wrap: wrap;
-    gap: 0.5rem;
   }
 
-  .tag {
-    padding: 0.25rem 0.75rem;
-    background: var(--primary-light);
-    color: var(--primary);
-    border-radius: 999px;
-    font-size: 0.875rem;
+  .add-to-classroom-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.4rem 0.875rem;
+    border: 1px solid var(--sl-color-hairline);
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--sl-color-gray-3);
+    font-size: 0.8rem;
     font-weight: 600;
+    cursor: pointer;
+    transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+    white-space: nowrap;
+  }
+  .add-to-classroom-btn:hover {
+    border-color: var(--sl-color-accent);
+    color: var(--sl-color-accent);
+  }
+  .add-to-classroom-btn.added {
+    border-color: var(--sl-color-accent);
+    background: var(--sl-color-accent-low);
+    color: var(--sl-color-accent);
   }
 
-  .docs-content {
-    line-height: 1.8;
-    color: var(--text-primary);
-  }
+  /* Content */
+  .docs-content { line-height: 1.8; color: var(--sl-color-gray-1); }
 
   .docs-content :global(h2) {
     margin-top: 2.5rem;
     margin-bottom: 1rem;
     padding-bottom: 0.5rem;
-    border-bottom: 1px solid var(--border);
-    scroll-margin-top: 80px;
-    font-size: 1.75rem;
+    border-bottom: 1px solid var(--sl-color-hairline);
+    scroll-margin-top: calc(var(--sl-nav-height) + 1rem);
+    font-size: 1.6rem;
+    color: var(--sl-color-gray-1);
   }
-
   .docs-content :global(h3) {
     margin-top: 2rem;
     margin-bottom: 0.75rem;
-    scroll-margin-top: 80px;
-    font-size: 1.375rem;
+    scroll-margin-top: calc(var(--sl-nav-height) + 1rem);
+    font-size: 1.25rem;
+    color: var(--sl-color-gray-1);
   }
+  .docs-content :global(p) { margin-bottom: 1rem; color: var(--sl-color-gray-2); }
+  .docs-content :global(ul), .docs-content :global(ol) { margin-bottom: 1rem; padding-left: 1.5rem; }
+  .docs-content :global(li) { margin-bottom: 0.4rem; color: var(--sl-color-gray-2); }
 
-  .docs-content :global(p) {
-    margin-bottom: 1rem;
-  }
-
-  .docs-content :global(ul),
-  .docs-content :global(ol) {
-    margin-bottom: 1rem;
-    padding-left: 1.5rem;
-  }
-
-  .docs-content :global(li) {
-    margin-bottom: 0.5rem;
-  }
-
-  .docs-content :global(pre) {
-    background: var(--bg-secondary);
-    padding: 0;
-    border-radius: 8px;
-    overflow: hidden;
-    margin: 1.5rem 0;
-    border: 1px solid var(--border);
-  }
-
-  .docs-content :global(.code-block-wrapper) {
-    position: relative;
-    margin: 1.5rem 0;
-  }
-
+  /* Code blocks */
+  .docs-content :global(.code-block-wrapper) { position: relative; margin: 1.5rem 0; }
   .docs-content :global(.code-block-header) {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 0.75rem 1rem;
-    background: var(--bg-tertiary);
-    border-bottom: 1px solid var(--border);
-    border-radius: 8px 8px 0 0;
+    padding: 0.6rem 1rem;
+    background: var(--sl-color-bg-sidebar);
+    border: 1px solid var(--sl-color-hairline);
+    border-bottom: none;
+    border-radius: var(--radius) var(--radius) 0 0;
   }
-
   .docs-content :global(.code-language) {
-    font-size: 0.75rem;
-    font-weight: 600;
+    font-size: 0.7rem;
+    font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    color: var(--primary);
-    font-family: 'Courier New', monospace;
+    color: var(--sl-color-accent);
+    font-family: monospace;
   }
-
   .docs-content :global(.code-copy-btn) {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    padding: 0.375rem 0.75rem;
-    background: var(--bg-primary);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    color: var(--text-secondary);
-    font-size: 0.75rem;
+    gap: 0.4rem;
+    padding: 0.3rem 0.65rem;
+    background: var(--sl-color-bg-nav);
+    border: 1px solid var(--sl-color-hairline);
+    border-radius: var(--radius-sm);
+    color: var(--sl-color-gray-3);
+    font-size: 0.72rem;
     font-weight: 500;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
   }
-
   .docs-content :global(.code-copy-btn:hover) {
-    background: var(--primary);
-    color: white;
-    border-color: var(--primary);
+    background: var(--sl-color-accent);
+    color: var(--sl-color-black);
+    border-color: var(--sl-color-accent);
   }
-
   .docs-content :global(.code-copy-btn.copied) {
-    background: oklch(0.7 0.15 120);
+    background: oklch(0.55 0.15 145);
     color: white;
-    border-color: oklch(0.7 0.15 120);
+    border-color: oklch(0.55 0.15 145);
   }
-
-  .docs-content :global(.code-copy-btn svg) {
-    width: 14px;
-    height: 14px;
-  }
-
   .docs-content :global(.code-block-wrapper pre) {
     margin: 0;
-    border-radius: 0 0 8px 8px;
+    border-radius: 0 0 var(--radius) var(--radius);
+    border: 1px solid var(--sl-color-hairline);
     padding: 1rem;
     overflow-x: auto;
   }
-
-  .docs-content :global(code) {
-    font-family: 'Courier New', monospace;
-    font-size: 0.9rem;
-  }
-
   .docs-content :global(p code) {
-    background: var(--bg-secondary);
-    padding: 0.2rem 0.4rem;
+    background: var(--sl-color-bg-sidebar);
+    padding: 0.15rem 0.4rem;
     border-radius: 4px;
     font-size: 0.875rem;
-    color: var(--primary);
-    border: 1px solid var(--border);
-  }
-
-  /* Syntax Highlighting Colors */
-  .docs-content :global(.hljs) {
-    background: var(--bg-secondary);
-    color: var(--text-primary);
-  }
-
-  .docs-content :global(.hljs-keyword),
-  .docs-content :global(.hljs-selector-tag),
-  .docs-content :global(.hljs-literal),
-  .docs-content :global(.hljs-section),
-  .docs-content :global(.hljs-link) {
-    color: oklch(0.6 0.2 300); /* Purple */
-    font-weight: 600;
-  }
-
-  .docs-content :global(.hljs-string),
-  .docs-content :global(.hljs-attr),
-  .docs-content :global(.hljs-attribute) {
-    color: oklch(0.6 0.15 120); /* Green */
-  }
-
-  .docs-content :global(.hljs-number),
-  .docs-content :global(.hljs-built_in),
-  .docs-content :global(.hljs-builtin-name) {
-    color: oklch(0.65 0.2 60); /* Orange */
-  }
-
-  .docs-content :global(.hljs-function),
-  .docs-content :global(.hljs-title),
-  .docs-content :global(.hljs-class) {
-    color: oklch(0.65 0.2 240); /* Blue */
-    font-weight: 600;
-  }
-
-  .docs-content :global(.hljs-comment),
-  .docs-content :global(.hljs-quote) {
-    color: var(--text-secondary);
-    font-style: italic;
-  }
-
-  .docs-content :global(.hljs-variable),
-  .docs-content :global(.hljs-template-variable) {
-    color: oklch(0.6 0.2 0); /* Red */
-  }
-
-  .docs-content :global(.hljs-tag),
-  .docs-content :global(.hljs-name),
-  .docs-content :global(.hljs-selector-id),
-  .docs-content :global(.hljs-selector-class) {
-    color: oklch(0.6 0.2 300); /* Purple */
-  }
-
-  .docs-content :global(.hljs-regexp),
-  .docs-content :global(.hljs-meta) {
-    color: oklch(0.65 0.15 180); /* Cyan */
-  }
-
-  .docs-content :global(.hljs-symbol),
-  .docs-content :global(.hljs-bullet) {
-    color: oklch(0.65 0.2 240); /* Blue */
+    color: var(--sl-color-accent-high);
+    border: 1px solid var(--sl-color-hairline);
   }
 
   /* Pagination */
@@ -652,372 +486,247 @@ const nextUrl = hasNext ? `?tab=${validTabIndex + 1}` : null;
     gap: 1rem;
     margin-top: 3rem;
     padding-top: 2rem;
-    border-top: 1px solid var(--border);
+    border-top: 1px solid var(--sl-color-hairline);
   }
-
-  .pagination-btn {
+  .pag-btn {
     display: flex;
     align-items: center;
-    gap: 1rem;
-    padding: 1.25rem;
-    background: var(--bg-secondary);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    color: var(--text-primary);
-    transition: all 0.2s;
+    gap: 0.75rem;
+    padding: 1rem 1.25rem;
+    background: var(--sl-color-bg-nav);
+    border: 1px solid var(--sl-color-hairline);
+    border-radius: var(--radius);
+    color: var(--sl-color-gray-1);
+    text-decoration: none;
+    transition: border-color 0.2s ease, background 0.2s ease;
   }
-
-  .pagination-btn:hover {
-    border-color: var(--primary);
-    background: var(--primary-light);
+  .pag-btn:hover {
+    border-color: var(--sl-color-accent);
+    background: var(--sl-color-accent-low);
+    color: var(--sl-color-gray-1);
   }
+  .pag-next { justify-content: flex-end; text-align: right; grid-column: 2; }
+  .pag-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--sl-color-gray-4); margin-bottom: 0.2rem; }
+  .pag-title { font-weight: 600; font-size: 0.9rem; color: var(--sl-color-gray-1); }
+  .pag-btn svg { flex-shrink: 0; color: var(--sl-color-accent); }
 
-  .pagination-btn.next {
-    justify-content: flex-end;
-    text-align: right;
-    grid-column: 2;
-  }
-
-  .pagination-btn svg {
-    flex-shrink: 0;
-    color: var(--primary);
-  }
-
-  .pagination-label {
-    font-size: 0.75rem;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--text-secondary);
-    margin-bottom: 0.25rem;
-  }
-
-  .pagination-title {
-    font-weight: 600;
-    color: var(--text-primary);
-  }
-
-  /* TOC Sidebar (Right) */
-  .toc-sidebar {
-    height: calc(100vh - 64px);
+  /* ── Right TOC ── */
+  .docs-toc {
     position: sticky;
-    top: 64px;
-    padding: 1.5rem 0;
+    top: var(--sl-nav-height);
+    height: calc(100vh - var(--sl-nav-height));
     overflow-y: auto;
+    padding: 1.5rem 0.75rem;
+    border-left: 1px solid var(--sl-color-hairline);
   }
 
-  .toc-header {
-    margin-bottom: 1rem;
-  }
-
-  .toc-header h3 {
-    font-size: 0.875rem;
-    font-weight: 600;
+  .toc-label {
+    font-size: 0.68rem;
+    font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--text-secondary);
-    margin: 0;
+    letter-spacing: 0.06em;
+    color: var(--sl-color-gray-4);
+    margin-bottom: 0.75rem;
   }
 
-  .toc-nav {
-    position: relative;
-  }
-
-  .toc-list {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    position: relative;
-  }
-
-  .toc-list li {
-    margin-bottom: 0.5rem;
-    position: relative;
-  }
+  .toc-list { list-style: none; margin: 0; padding: 0; }
+  .toc-list li { margin-bottom: 0.15rem; position: relative; }
 
   .toc-link {
     display: block;
-    padding: 0.5rem 0.75rem;
-    font-size: 0.875rem;
-    color: var(--text-secondary);
-    transition: color 0.15s ease;
-    position: relative;
-    --fill-progress: 0%;
+    padding: 0.35rem 0.5rem 0.35rem 0.75rem;
+    font-size: 0.8rem;
+    color: var(--sl-color-gray-3);
+    text-decoration: none;
+    border-left: 2px solid var(--sl-color-hairline);
+    transition: color 0.15s ease, border-color 0.15s ease;
+    line-height: 1.4;
+    --fill: 0;
   }
-
-  .toc-link::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    width: 3px;
-    background: var(--border);
-    border-radius: 2px;
-    transition: background 0.2s ease;
-  }
-
   .toc-link::after {
     content: '';
     position: absolute;
     left: 0;
     top: 0;
-    width: 3px;
-    height: var(--fill-progress);
-    background: var(--primary);
-    border-radius: 2px;
-    transition: height 0.1s ease;
+    width: 2px;
+    height: calc(var(--fill) * 100%);
+    background: var(--sl-color-accent);
+    border-radius: 1px;
+    transition: height 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   }
+  .toc-link:hover { color: var(--sl-color-gray-1); border-left-color: var(--sl-color-gray-4); }
+  .toc-link.active { color: var(--sl-color-accent); border-left-color: var(--sl-color-accent); font-weight: 500; }
+  .toc-link.done { border-left-color: var(--sl-color-accent); }
+  .toc-link.done::after { height: 100%; }
+  .toc-empty { font-size: 0.8rem; color: var(--sl-color-gray-4); font-style: italic; }
 
-  .toc-link:hover {
-    color: var(--primary);
+  /* ── Responsive ── */
+  @media (max-width: 60rem) {
+    .docs-layout { grid-template-columns: var(--sl-sidebar-width) 1fr; }
+    .docs-toc { display: none; }
   }
-
-  .toc-link.active {
-    color: var(--primary);
-    font-weight: 500;
-  }
-
-  .toc-link.completed::before {
-    background: var(--primary);
-  }
-
-  .toc-link.completed::after {
-    height: 100%;
-  }
-
-  .toc-progress {
-    display: none;
-  }
-
-  .toc-empty {
-    font-size: 0.875rem;
-    color: var(--text-secondary);
-    font-style: italic;
-  }
-
-  @media (max-width: 1400px) {
-    .docs-container {
-      grid-template-columns: 260px 1fr 220px;
-    }
-  }
-
-  @media (max-width: 1200px) {
-    .docs-container {
-      grid-template-columns: 240px 1fr;
-    }
-
-    .toc-sidebar {
-      display: none;
-    }
-  }
-
-  @media (max-width: 900px) {
-    .docs-container {
-      grid-template-columns: 1fr;
-    }
-
-    .tabs-sidebar {
-      display: none;
-    }
-
-    .docs-main {
-      padding: 1rem;
-    }
-
-    .docs-header h1 {
-      font-size: 2rem;
-    }
-
-    .pagination {
-      grid-template-columns: 1fr;
-    }
-
-    .pagination-btn.next {
-      grid-column: 1;
-    }
+  @media (max-width: 50rem) {
+    .docs-layout { grid-template-columns: 1fr; }
+    .docs-sidebar { display: none; }
+    .docs-main { padding: 1.25rem; }
+    .pagination { grid-template-columns: 1fr; }
+    .pag-next { grid-column: 1; }
   }
 </style>
 
 <script is:inline>
-  (function() {
-    // Try to load navigation tree
+  (function () {
+    // ── Nav tree ──
     async function loadNavTree() {
-      const navWrapper = document.getElementById('nav-tree-wrapper');
-      const tabsFallback = document.getElementById('tabs-fallback');
-      
-      if (!navWrapper) return;
-      
-      // Extract category from URL
-      const pathParts = window.location.pathname.split('/');
-      const category = pathParts[2]; // /docs/category/slug
-      
-      if (!category) {
-        // Show tabs fallback
-        if (tabsFallback) tabsFallback.style.display = 'block';
-        return;
-      }
-      
+      var wrapper  = document.getElementById('nav-tree-wrapper');
+      var fallback = document.getElementById('tabs-fallback');
+      if (!wrapper) return;
+      var pathParts = window.location.pathname.split('/');
+      var category  = pathParts[2];
+      if (!category) { if (fallback) fallback.style.display = 'block'; return; }
       try {
-        const response = await fetch(`/api/nav/get-tree?category=${category}`);
-        const data = await response.json();
-        
+        var res  = await fetch('/api/nav/get-tree?category=' + category);
+        var data = await res.json();
         if (data.success && data.tree && data.tree.length > 0) {
-          // Hide tabs fallback
-          if (tabsFallback) tabsFallback.style.display = 'none';
-          
-          // Render navigation tree
-          navWrapper.innerHTML = renderNavTree(data.tree);
-          attachNavListeners();
+          if (fallback) fallback.style.display = 'none';
+          wrapper.innerHTML = renderTree(data.tree);
+          attachFolderListeners();
         } else {
-          // Show tabs fallback
-          if (tabsFallback) tabsFallback.style.display = 'block';
+          if (fallback) fallback.style.display = 'block';
         }
-      } catch (error) {
-        console.error('Error loading nav tree:', error);
-        // Show tabs fallback on error
-        if (tabsFallback) tabsFallback.style.display = 'block';
+      } catch (_) {
+        if (fallback) fallback.style.display = 'block';
       }
     }
-    
-    function renderNavTree(items, level = 0) {
-      if (!items || items.length === 0) return '';
-      
-      return items.map(function(item) {
+
+    function renderTree(items, level) {
+      level = level || 0;
+      return items.map(function (item) {
         if (item.type === 'folder') {
-          return `
-            <div class="nav-folder nav-level-${level}">
-              <div class="nav-folder-header">
-                <span class="nav-folder-icon">▶</span>
-                <span class="nav-folder-name">${item.name}</span>
-              </div>
-              <div class="nav-folder-children">
-                ${renderNavTree(item.children, level + 1)}
-              </div>
-            </div>
-          `;
-        } else {
-          const url = `/docs/${item.category}/${item.slug}`;
-          const isActive = window.location.pathname === url;
-          return `
-            <a href="${url}" class="nav-doc-link ${isActive ? 'active' : ''}">
-              ${item.name}
-            </a>
-          `;
+          return '<div class="nav-folder nav-level-' + level + '">' +
+            '<div class="nav-folder-header"><span class="nav-folder-icon">▶</span><span class="nav-folder-name">' + item.name + '</span></div>' +
+            '<div class="nav-folder-children">' + renderTree(item.children || [], level + 1) + '</div>' +
+            '</div>';
         }
+        var url    = '/docs/' + item.category + '/' + item.slug;
+        var active = window.location.pathname === url ? ' active' : '';
+        return '<a href="' + url + '" class="nav-doc-link' + active + '">' + item.name + '</a>';
       }).join('');
     }
-    
-    function attachNavListeners() {
-      document.querySelectorAll('.nav-folder-header').forEach(function(header) {
-        header.addEventListener('click', function() {
-          const folder = header.closest('.nav-folder');
-          if (folder) {
-            folder.classList.toggle('expanded');
-          }
+
+    function attachFolderListeners() {
+      document.querySelectorAll('.nav-folder-header').forEach(function (h) {
+        h.addEventListener('click', function () {
+          var f = h.closest('.nav-folder');
+          if (f) f.classList.toggle('expanded');
         });
       });
     }
-    
-    // Load navigation tree on page load
+
     loadNavTree();
 
-    // Copy code to clipboard
-    window.copyCode = function(codeId) {
-      const codeElement = document.getElementById(codeId);
-      if (!codeElement) return;
-      
-      const code = codeElement.textContent || '';
-      const button = event.target.closest('.code-copy-btn');
-      
-      navigator.clipboard.writeText(code).then(function() {
-        // Show success state
-        const originalText = button.querySelector('.copy-text').textContent;
-        button.classList.add('copied');
-        button.querySelector('.copy-text').textContent = 'Copied!';
-        
-        // Reset after 2 seconds
-        setTimeout(function() {
-          button.classList.remove('copied');
-          button.querySelector('.copy-text').textContent = originalText;
+    // ── Copy code ──
+    window.copyCode = function (codeId) {
+      var el = document.getElementById(codeId);
+      if (!el) return;
+      var btn = event.target.closest('.code-copy-btn');
+      navigator.clipboard.writeText(el.textContent || '').then(function () {
+        if (!btn) return;
+        btn.classList.add('copied');
+        var span = btn.querySelector('.copy-text');
+        var orig = span ? span.textContent : '';
+        if (span) span.textContent = 'Copied!';
+        setTimeout(function () {
+          btn.classList.remove('copied');
+          if (span) span.textContent = orig;
         }, 2000);
-      }).catch(function(err) {
-        console.error('Failed to copy:', err);
-        alert('Failed to copy code');
-      });
+      }).catch(function () {});
     };
 
-    // TOC: Track active heading and precise scroll progress
-    const tocLinks = document.querySelectorAll('.toc-link');
-    const headings = document.querySelectorAll('.docs-content h2[id]');
-    
+    // ── TOC scroll progress ──
+    var tocLinks = document.querySelectorAll('.toc-link');
+    var headings = document.querySelectorAll('.docs-content h2[id]');
     if (tocLinks.length && headings.length) {
-      // Update TOC bars based on scroll position
-      function updateTOC() {
-        const scrollTop = window.scrollY;
-        
-        headings.forEach(function(heading, index) {
-          const headingTop = heading.offsetTop - 100;
-          const nextHeading = headings[index + 1];
-          const headingBottom = nextHeading ? nextHeading.offsetTop - 100 : document.documentElement.scrollHeight;
-          
-          const tocLink = Array.from(tocLinks).find(function(link) {
-            return link.getAttribute('data-slug') === heading.id;
-          });
-          
-          if (!tocLink) return;
-          
-          // Remove all classes first
-          tocLink.classList.remove('active', 'completed');
-          
-          if (scrollTop < headingTop) {
-            // Section not reached yet - empty bar
-            tocLink.style.setProperty('--fill-progress', '0%');
-          } else if (scrollTop >= headingTop && scrollTop < headingBottom) {
-            // Currently viewing this section - partial fill based on progress
-            tocLink.classList.add('active');
-            
-            const sectionHeight = headingBottom - headingTop;
-            const scrolledInSection = scrollTop - headingTop;
-            const progress = Math.min(Math.max(scrolledInSection / sectionHeight, 0), 1);
-            
-            // Convert to percentage for precise bar fill
-            const fillPercentage = progress * 100;
-            tocLink.style.setProperty('--fill-progress', fillPercentage + '%');
+      function updateToc() {
+        var scrollTop = window.scrollY;
+        headings.forEach(function (h, i) {
+          var top  = h.offsetTop - 100;
+          var next = headings[i + 1];
+          var bot  = next ? next.offsetTop - 100 : document.documentElement.scrollHeight;
+          var link = Array.from(tocLinks).find(function (l) { return l.getAttribute('data-slug') === h.id; });
+          if (!link) return;
+          link.classList.remove('active', 'done');
+          if (scrollTop < top) {
+            link.style.setProperty('--fill', '0');
+          } else if (scrollTop >= top && scrollTop < bot) {
+            link.classList.add('active');
+            link.style.setProperty('--fill', String(Math.min(Math.max((scrollTop - top) / (bot - top), 0), 1)));
           } else {
-            // Section already passed - fully filled bar
-            tocLink.classList.add('completed');
-            tocLink.style.setProperty('--fill-progress', '100%');
+            link.classList.add('done');
+            link.style.setProperty('--fill', '1');
           }
         });
       }
-      
-      // Update on scroll with throttling for smooth performance
-      let ticking = false;
-      window.addEventListener('scroll', function() {
-        if (!ticking) {
-          window.requestAnimationFrame(function() {
-            updateTOC();
-            ticking = false;
-          });
-          ticking = true;
-        }
+      var ticking = false;
+      window.addEventListener('scroll', function () {
+        if (!ticking) { requestAnimationFrame(function () { updateToc(); ticking = false; }); ticking = true; }
       });
-      
-      // Initial update
-      updateTOC();
+      updateToc();
     }
 
-    // TOC: Click to scroll
-    tocLinks.forEach(function(link) {
-      link.addEventListener('click', function(e) {
+    tocLinks.forEach(function (l) {
+      l.addEventListener('click', function (e) {
         e.preventDefault();
-        const slug = this.getAttribute('data-slug');
-        const target = document.getElementById(slug);
-        if (target) {
-          target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          history.pushState(null, '', '#' + slug);
-        }
+        var id = l.getAttribute('data-slug');
+        var el = id && document.getElementById(id);
+        if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); history.pushState(null, '', '#' + id); }
       });
     });
+
+    // ── Add to Classroom ──
+    var CLASSROOM_KEY = 'xdoxs-classroom';
+
+    function getClassroom() {
+      try { return JSON.parse(localStorage.getItem(CLASSROOM_KEY) || '[]'); } catch (_) { return []; }
+    }
+    function saveClassroom(list) {
+      localStorage.setItem(CLASSROOM_KEY, JSON.stringify(list));
+    }
+
+    var atcBtn = document.getElementById('add-to-classroom');
+    if (atcBtn) {
+      var cat   = atcBtn.getAttribute('data-category');
+      var slug  = atcBtn.getAttribute('data-slug');
+      var ttl   = atcBtn.getAttribute('data-title');
+      var url   = atcBtn.getAttribute('data-url');
+      var label = document.getElementById('atc-label');
+      var id    = cat + '/' + slug;
+
+      // Set initial state
+      var list = getClassroom();
+      var alreadyAdded = list.some(function (d) { return d.id === id; });
+      if (alreadyAdded) {
+        atcBtn.classList.add('added');
+        if (label) label.textContent = '✓ In Classroom';
+      }
+
+      atcBtn.addEventListener('click', function () {
+        var current = getClassroom();
+        var exists  = current.some(function (d) { return d.id === id; });
+
+        if (exists) {
+          // Remove
+          saveClassroom(current.filter(function (d) { return d.id !== id; }));
+          atcBtn.classList.remove('added');
+          if (label) label.textContent = 'Add to Classroom';
+        } else {
+          // Add
+          current.push({ id: id, category: cat, slug: slug, title: ttl, url: url, addedAt: Date.now() });
+          saveClassroom(current);
+          atcBtn.classList.add('added');
+          if (label) label.textContent = '✓ In Classroom';
+        }
+      });
+    }
   })();
 </script>

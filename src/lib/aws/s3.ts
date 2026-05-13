@@ -18,32 +18,42 @@ import {
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
-const REGION = import.meta.env.AWS_REGION || process.env.AWS_REGION || 'ap-south-2';
-const BUCKET = import.meta.env.S3_DOCS_BUCKET || process.env.S3_DOCS_BUCKET || 'xdoxs-docs-content';
+// Handle both Astro (import.meta.env) and Node scripts (process.env)
+const REGION = (typeof import.meta !== 'undefined' && import.meta.env?.AWS_REGION)
+  || process.env.AWS_REGION
+  || 'ap-south-2';
+
+const BUCKET = (typeof import.meta !== 'undefined' && import.meta.env?.S3_DOCS_BUCKET)
+  || process.env.S3_DOCS_BUCKET
+  || 'xdoxs-docs-656829';
+
+const ACCESS_KEY_ID = (typeof import.meta !== 'undefined' && import.meta.env?.AWS_ACCESS_KEY_ID)
+  || process.env.AWS_ACCESS_KEY_ID;
+
+const SECRET_ACCESS_KEY = (typeof import.meta !== 'undefined' && import.meta.env?.AWS_SECRET_ACCESS_KEY)
+  || process.env.AWS_SECRET_ACCESS_KEY;
 
 let _client: S3Client | null = null;
 
-/** Check if we should use S3 (production deployment only, not local preview) */
+/** Check if we should use S3 */
 function shouldUseS3(): boolean {
-  // Check if explicitly enabled for local testing
-  const enableS3Locally = process.env.ENABLE_S3_LOCAL === 'true';
-  
-  // In production, always try to use S3 if credentials are available
-  const isProduction = process.env.NODE_ENV === 'production';
-  
-  // Skip S3 if:
-  // 1. Not in production AND not explicitly enabled for local testing
-  // 2. OR AWS credentials are not available
-  if (!isProduction && !enableS3Locally) {
-    return false;
-  }
-  
-  // Check if AWS credentials are available
-  if (!process.env.AWS_REGION && !process.env.AWS_ACCESS_KEY_ID) {
-    return false;
-  }
-  
-  return true;
+  // Read from both import.meta.env (Astro SSR) and process.env (scripts)
+  const enableS3Locally =
+    (typeof import.meta !== 'undefined' && import.meta.env?.ENABLE_S3_LOCAL === 'true') ||
+    process.env.ENABLE_S3_LOCAL === 'true';
+
+  const isProduction =
+    (typeof import.meta !== 'undefined' && import.meta.env?.PROD === true) ||
+    process.env.NODE_ENV === 'production';
+
+  if (!isProduction && !enableS3Locally) return false;
+
+  // Need at least a region to talk to S3
+  const hasRegion =
+    (typeof import.meta !== 'undefined' && !!import.meta.env?.AWS_REGION) ||
+    !!process.env.AWS_REGION;
+
+  return hasRegion;
 }
 
 /** Export as isS3Enabled for external use */
@@ -53,7 +63,16 @@ export function isS3Enabled(): boolean {
 
 function getS3Client(): S3Client {
   if (!_client) {
-    _client = new S3Client({ region: REGION });
+    const config: any = { region: REGION };
+    
+    if (ACCESS_KEY_ID && SECRET_ACCESS_KEY) {
+      config.credentials = {
+        accessKeyId: ACCESS_KEY_ID,
+        secretAccessKey: SECRET_ACCESS_KEY,
+      };
+    }
+    
+    _client = new S3Client(config);
   }
   return _client;
 }
@@ -105,13 +124,6 @@ export async function getMarkdown(
   category: string,
   slug: string
 ): Promise<string | null> {
-  const isProduction = import.meta.env.PROD || process.env.NODE_ENV === 'production';
-  
-  if (!isProduction) {
-    console.log('🔧 Local dev: Skipping S3 fetch (using MongoDB)');
-    return null;
-  }
-
   try {
     const client = getS3Client();
     const response = await client.send(
@@ -126,7 +138,7 @@ export async function getMarkdown(
       return null;
     }
     console.error('⚠️ S3 fetch failed:', err);
-    return null; // Fallback to MongoDB
+    return null;
   }
 }
 

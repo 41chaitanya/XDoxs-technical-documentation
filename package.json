@@ -21,7 +21,8 @@
     "test-mongo": "tsx scripts/test-mongodb-only.ts",
     "test-s3": "tsx scripts/test-s3-connection.ts",
     "import-s3": "tsx scripts/import-from-s3.ts",
-    "upload-samples": "tsx scripts/upload-sample-docs.ts"
+    "upload-samples": "tsx scripts/upload-sample-docs.ts",
+    "generate-index": "tsx scripts/generate-index.ts"
   },
   "dependencies": {
     "@astrojs/check": "^0.9.8",

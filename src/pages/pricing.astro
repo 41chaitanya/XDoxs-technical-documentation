@@ -1,0 +1,172 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Header from '../components/Header.astro';
+
+export const prerender = true;
+---
+
+<BaseLayout title="Pricing — XDoxs" description="Choose the plan that's right for you">
+  <Header />
+
+  <main class="pricing-page" id="main-content">
+    <div class="pr-inner">
+
+      <!-- Header -->
+      <div class="pr-header">
+        <nav class="breadcrumbs" aria-label="Breadcrumb" style="margin-bottom:0.75rem">
+          <a href="/">Home</a>
+          <span class="sep" aria-hidden="true">›</span>
+          <span class="current">Pricing</span>
+        </nav>
+        <h1>Choose Your Plan</h1>
+        <p class="pr-sub">Start learning for free, upgrade anytime for premium content.</p>
+      </div>
+
+      <!-- Plans -->
+      <div class="pr-plans">
+
+        <!-- Free Plan -->
+        <div class="pr-card">
+          <span class="badge badge-free">Free</span>
+          <h2>Free Plan</h2>
+          <p class="pr-price">₹0<span class="pr-period">/forever</span></p>
+          <ul class="pr-features">
+            <li>✓ Access to all free documentation</li>
+            <li>✓ English & Hinglish content</li>
+            <li>✓ MCQ practice questions</li>
+            <li>✓ Community blogs</li>
+            <li>✓ Progress tracking</li>
+          </ul>
+          <a href="/register" class="btn-outline" style="width:100%;justify-content:center">Get Started</a>
+        </div>
+
+        <!-- Premium Plan -->
+        <div class="pr-card pr-card-featured">
+          <span class="badge badge-premium">Premium</span>
+          <h2>Premium Plan</h2>
+          <p class="pr-price">₹499<span class="pr-period">/month</span></p>
+          <ul class="pr-features">
+            <li>✓ Everything in Free</li>
+            <li>✓ Access to premium subjects</li>
+            <li>✓ Advanced topics & deep dives</li>
+            <li>✓ Previous Year Questions (PYQ)</li>
+            <li>✓ Priority support</li>
+            <li>✓ Downloadable resources</li>
+          </ul>
+          <a href="/register" class="btn-primary" style="width:100%;justify-content:center">Upgrade Now</a>
+        </div>
+
+      </div>
+
+    </div>
+  </main>
+
+  <footer class="sd-footer" role="contentinfo">
+    <div class="pr-inner">
+      <p>&copy; 2026 XDoxs by <a href="https://sheryians.com/" target="_blank" rel="noopener noreferrer">Sheryians Coding School</a></p>
+    </div>
+  </footer>
+</BaseLayout>
+
+<style>
+  .pricing-page {
+    min-height: calc(100vh - var(--sl-nav-height));
+    background: var(--sl-color-bg);
+  }
+
+  .pr-inner {
+    max-width: var(--container);
+    margin: 0 auto;
+    padding: 2.5rem 1.5rem;
+  }
+
+  .pr-header {
+    text-align: center;
+    margin-bottom: 3rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid var(--sl-color-hairline);
+  }
+
+  .pr-header h1 {
+    font-size: clamp(1.75rem, 4vw, 2.25rem);
+    color: var(--sl-color-gray-1);
+    margin-bottom: 0.5rem;
+  }
+
+  .pr-sub {
+    font-size: 1rem;
+    color: var(--sl-color-gray-3);
+    margin: 0;
+  }
+
+  /* Plans grid */
+  .pr-plans {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+    gap: 2rem;
+    max-width: 50rem;
+    margin: 0 auto;
+  }
+
+  .pr-card {
+    padding: 2rem 1.75rem;
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: var(--radius);
+    background: var(--sl-color-bg-nav);
+    animation: card-in 0.35s ease-out both;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+
+  .pr-card-featured {
+    border-color: var(--sl-color-accent);
+    box-shadow: 0 0 0 1px var(--sl-color-accent);
+  }
+
+  .pr-card h2 {
+    font-size: 1.5rem;
+    color: var(--sl-color-gray-1);
+    margin: 0;
+  }
+
+  .pr-price {
+    font-size: 2.5rem;
+    font-weight: 800;
+    color: var(--sl-color-gray-1);
+    margin: 0;
+    line-height: 1;
+  }
+
+  .pr-period {
+    font-size: 1rem;
+    font-weight: 400;
+    color: var(--sl-color-gray-4);
+  }
+
+  .pr-features {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    flex: 1;
+  }
+
+  .pr-features li {
+    font-size: 0.9rem;
+    color: var(--sl-color-gray-2);
+    line-height: 1.5;
+  }
+
+  /* Footer */
+  .sd-footer {
+    padding: 2rem 0;
+    border-top: 1px solid var(--sl-color-hairline-shade);
+    text-align: center;
+    margin-top: 4rem;
+  }
+  .sd-footer p { color: var(--sl-color-gray-4); font-size: 0.875rem; margin: 0; }
+  .sd-footer a { color: var(--sl-color-accent); font-weight: 600; }
+</style>

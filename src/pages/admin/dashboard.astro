@@ -31,28 +31,13 @@ const userRole = payload.role;
         <a href="/admin/writing-guide" class="btn-secondary">
           <span class="icon">📚</span> Writing Guide
         </a>
-        <a href="/admin/upload" class="btn-primary">
-          <span class="icon">↑</span> Upload Documentation
-        </a>
       </div>
     </div>
 
-    <div class="stats-grid">
-      <div class="stat-card">
-        <div class="stat-value" id="pending-count">0</div>
-        <div class="stat-label">Pending Review</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-value" id="published-count">0</div>
-        <div class="stat-label">Published</div>
-      </div>
-    </div>
-
-    <div class="docs-section">
-      <h2>My Submissions</h2>
-      <div class="docs-list" id="docs-list">
-        <div class="loading">Loading...</div>
-      </div>
+    <div class="empty-state">
+      <h2>📚 Documentation Management</h2>
+      <p>All documentation is managed directly in S3 storage.</p>
+      <p>Use the writing guide to learn best practices for creating documentation.</p>
     </div>
   </div>
 
@@ -131,180 +116,23 @@ const userRole = payload.role;
       font-weight: bold;
     }
 
-    .stats-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 1.5rem;
-      margin-bottom: 3rem;
-    }
-
-    .stat-card {
-      background: var(--bg-secondary);
-      padding: 1.5rem;
-      border-radius: 12px;
-      border: 1px solid var(--border);
+    .empty-state {
       text-align: center;
-    }
-
-    .stat-value {
-      font-size: 2.5rem;
-      font-weight: bold;
-      color: var(--primary);
-      margin-bottom: 0.5rem;
-    }
-
-    .stat-label {
+      padding: 4rem 2rem;
       color: var(--text-secondary);
-      font-size: 0.9rem;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      margin-top: 2rem;
     }
 
-    .docs-section h2 {
-      margin-bottom: 1.5rem;
+    .empty-state h2 {
       color: var(--text-primary);
-    }
-
-    .docs-list {
-      display: flex;
-      flex-direction: column;
-      gap: 1rem;
-    }
-
-    .loading {
-      text-align: center;
-      padding: 2rem;
-      color: var(--text-secondary);
-    }
-
-    .doc-card {
-      background: var(--bg-secondary);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 1.5rem;
-    }
-
-    .doc-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: start;
       margin-bottom: 1rem;
     }
 
-    .doc-title {
-      font-size: 1.25rem;
-      font-weight: 600;
-      color: var(--text-primary);
-      margin: 0 0 0.5rem 0;
-    }
-
-    .doc-meta {
-      display: flex;
-      gap: 1rem;
-      font-size: 0.875rem;
-      color: var(--text-secondary);
-    }
-
-    .doc-status {
-      display: inline-block;
-      padding: 0.25rem 0.75rem;
-      border-radius: 20px;
-      font-size: 0.75rem;
-      font-weight: 500;
-      text-transform: uppercase;
-    }
-
-    .status-pending_review {
-      background: oklch(0.9 0.05 31.08 / 50%);
-      color: oklch(0.4 0.15 31.08);
-    }
-
-    .status-approved {
-      background: oklch(0.9 0.05 120 / 50%);
-      color: oklch(0.4 0.15 120);
-    }
-
-    .empty-state {
-      text-align: center;
-      padding: 3rem;
-      color: var(--text-secondary);
-    }
-
-    .btn-edit {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.5rem 1rem;
-      background: var(--primary);
-      color: white;
-      text-decoration: none;
-      border-radius: 6px;
-      font-size: 0.875rem;
-      font-weight: 500;
-      transition: all 0.2s;
-    }
-
-    .btn-edit:hover {
-      background: var(--primary-hover);
+    .empty-state p {
+      margin: 0.5rem 0;
     }
   </style>
-
-  <script is:inline>
-    async function loadDocs() {
-      try {
-        const response = await fetch('/api/docs/list');
-        const data = await response.json();
-
-        if (!data.success) {
-          throw new Error(data.error);
-        }
-
-        const docsList = document.getElementById('docs-list');
-        const drafts = data.drafts || [];
-
-        // Update stats
-        const pending = drafts.filter(d => d.status === 'pending_review').length;
-        const published = drafts.filter(d => d.status === 'approved').length;
-
-        document.getElementById('pending-count').textContent = String(pending);
-        document.getElementById('published-count').textContent = String(published);
-
-        // Render docs
-        if (drafts.length === 0) {
-          docsList.innerHTML = '<div class="empty-state"><p>No documentation yet. Upload your first one!</p></div>';
-          return;
-        }
-
-        docsList.innerHTML = drafts.map(function(draft) {
-          const statusLabel = draft.status === 'pending_review' ? 'Pending Review' : 'Published';
-          const editBtn = draft.status === 'approved' 
-            ? `<a href="/admin/manage/${draft._id}" class="btn-edit">⚙️ Manage</a>`
-            : '';
-          
-          return `
-            <div class="doc-card">
-              <div class="doc-header">
-                <div style="flex: 1;">
-                  <h3 class="doc-title">${draft.title}</h3>
-                  <div class="doc-meta">
-                    <span>Category: ${draft.category}</span>
-                    <span>Tabs: ${draft.tabs?.length || 0}</span>
-                    <span>Updated: ${new Date(draft.updatedAt).toLocaleDateString()}</span>
-                  </div>
-                </div>
-                <div style="display: flex; align-items: center; gap: 0.75rem;">
-                  <span class="doc-status status-${draft.status}">${statusLabel}</span>
-                  ${editBtn}
-                </div>
-              </div>
-              ${draft.description ? `<p style="color: var(--text-secondary);">${draft.description}</p>` : ''}
-            </div>
-          `;
-        }).join('');
-      } catch (error) {
-        console.error('Error loading docs:', error);
-        document.getElementById('docs-list').innerHTML = '<div class="empty-state"><p>Error loading documentation.</p></div>';
-      }
-    }
-
-    loadDocs();
-  </script>
 </BaseLayout>
